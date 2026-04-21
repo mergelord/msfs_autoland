@@ -215,3 +215,22 @@ class MSFSControl:
 
         except Exception as e:
             logger.error(f"Error setting rudder: {e}")
+
+    def set_aileron(self, percent: float):
+        """
+        Установить элероны (-1.0 до +1.0)
+
+        Args:
+            percent: Положение элеронов
+                    -1.0 = полностью влево (левый крен)
+                     0.0 = нейтраль
+                    +1.0 = полностью вправо (правый крен)
+        """
+        try:
+            # SimConnect использует диапазон -16384 до +16384
+            value = int(percent * 16384)
+            self.ae.event("AILERON_SET", value)
+            logger.debug(f"Aileron set: {percent:+.2f} ({value})")
+
+        except Exception as e:
+            logger.error(f"Error setting aileron: {e}")

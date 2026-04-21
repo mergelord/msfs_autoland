@@ -635,6 +635,16 @@ class LandingPhaseState(ApproachPhaseState):
                         current_speed,
                         self.system.control
                     )
+
+                    # Компенсация крена элеронами
+                    if hasattr(self.system, 'aileron_compensation') and self.system.aileron_compensation:
+                        rudder_deflection = self.system.rudder_compensation.current_rudder
+                        self.system.aileron_compensation.apply_compensation(
+                            engine_throttles,
+                            rudder_deflection,
+                            current_speed,
+                            self.system.control
+                        )
             else:
                 # Fallback на симметричную тягу
                 self.system.control.set_throttle(flare_params['throttle'])

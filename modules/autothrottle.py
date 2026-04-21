@@ -1,12 +1,14 @@
 """
 Автоматический контроллер тяги (Autothrottle) для фазы FINAL
-с учётом веса, конфигурации и интеграцией с vJoy
+с учётом веса, конфигурации, интеграцией с vJoy и детектором отказов двигателей
 """
 
 import logging
 import time
 from dataclasses import dataclass
 from typing import Dict, Optional
+
+from modules.engine_failure_detector import EngineFailureDetector
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +39,12 @@ class AutothrottleConfig:
 
 
 class AutothrottleController:
-    """PID контроллер автоматической тяги"""
+    """PID контроллер автоматической тяги с поддержкой отказов двигателей"""
 
-    def __init__(self, config: Optional[AutothrottleConfig] = None):
+    def __init__(self, config: Optional[AutothrottleConfig] = None,
+                 engine_failure_detector: Optional[EngineFailureDetector] = None):
         self.config = config or AutothrottleConfig()
+        self.engine_failure_detector = engine_failure_detector
 
         # Состояние PID контроллера
         self.integral = 0.0
@@ -48,8 +52,11 @@ class AutothrottleController:
         self.previous_time = None
         self.current_throttle = 0.5
 
-        # Статистика
+        # Режим работы
         self.active = False
+        self.asymmetric_mode = False  # Режим асимметричной тяги при отказе двигателя
+
+        # Статистика
         self.total_corrections = 0
 
     def reset(self):
@@ -273,14 +280,63 @@ class AutothrottleController:
         # 5. Итоговая тяга
         new_throttle = base_throttle + wind_correction + crosswind_drag + pid_correction
 
-        # 6. Ограничение скорости изменения (плавность)
+        # 6. Проверка отказов двигателей и переключение на асимметричный режим
+        engine_throttles = None
+        has_engine_failure = False
+
+        if self.engine_failure_detector:
+            # Обновление данных детектора
+            self.engine_failure_detector.update_engine_data(telemetry)
+
+            # Проверка наличия отказов
+            if self.engine_failure_detector.has_engine_failure():
+                has_engine_failure = True
+
+                if not self.asymmetric_mode:
+                    # Переключение в асимметричный режим
+                    self.asymmetric_mode = True
+                    failed_engines = self.engine_failure_detector.get_failed_engines()
+                    logger.critical(f"SWITCHING TO ASYMMETRIC THRUST MODE - Failed engines: {failed_engines}")
+
+                # Расчёт асимметричной тяги
+                corrections = self.engine_failure_detector.calculate_asymmetric_thrust_correction()
+
+                # Применение базовой тяги с коррекциями для каждого двигателя
+                engine_throttles = {}
+                for i in range(1, self.engine_failure_detector.number_of_engines + 1):
+                    correction = corrections.get(f'engine_{i}', 1.0)
+                    engine_throttles[i] = new_throttle * correction
+
+                logger.warning(f"Asymmetric throttle: {engine_throttles}")
+
+            else:
+                # Нет отказов - симметричная тяга
+                if self.asymmetric_mode:
+                    # Выход из асимметричного режима
+                    self.asymmetric_mode = False
+                    logger.info("Exiting asymmetric thrust mode - all engines operational")
+
+                # engine_throttles остаётся None для симметричного режима
+        else:
+            # Детектор не подключён - используем симметричную тягу
+            engine_throttles = None
+
+        # 7. Ограничение скорости изменения (плавность)
         throttle_change = new_throttle - self.current_throttle
         if abs(throttle_change) > self.config.max_throttle_rate:
             throttle_change = self.config.max_throttle_rate * (1 if throttle_change > 0 else -1)
             new_throttle = self.current_throttle + throttle_change
 
-        # 7. Ограничение диапазона
+        # 8. Ограничение диапазона
         new_throttle = max(self.config.min_throttle, min(self.config.max_throttle, new_throttle))
+
+        # Применение ограничений к индивидуальным двигателям
+        if engine_throttles:
+            for engine_idx in engine_throttles.keys():
+                engine_throttles[engine_idx] = max(
+                    self.config.min_throttle,
+                    min(self.config.max_throttle, engine_throttles[engine_idx])
+                )
 
         # Обновление состояния
         self.current_throttle = new_throttle
@@ -290,11 +346,17 @@ class AutothrottleController:
         speed_error = abs(current_speed - target_speed)
         is_stable = speed_error < self.config.target_speed_tolerance
 
-        logger.info(f"Autothrottle: {new_throttle*100:.1f}% "
-                   f"(IAS: {current_speed:.0f}kt → {target_speed:.0f}kt, "
-                   f"error: {speed_error:.1f}kt, "
-                   f"wind: {headwind:+.0f}kt head / {abs(crosswind):.0f}kt cross, "
-                   f"bank: {current_bank:+.1f}°)")
+        # Логирование
+        if has_engine_failure:
+            logger.warning(f"Autothrottle (ASYMMETRIC): {new_throttle*100:.1f}% base "
+                          f"(IAS: {current_speed:.0f}kt → {target_speed:.0f}kt, "
+                          f"error: {speed_error:.1f}kt, engines: {engine_throttles})")
+        else:
+            logger.info(f"Autothrottle: {new_throttle*100:.1f}% "
+                       f"(IAS: {current_speed:.0f}kt → {target_speed:.0f}kt, "
+                       f"error: {speed_error:.1f}kt, "
+                       f"wind: {headwind:+.0f}kt head / {abs(crosswind):.0f}kt cross, "
+                       f"bank: {current_bank:+.1f}°)")
 
         return {
             'active': True,
@@ -309,7 +371,10 @@ class AutothrottleController:
             'current_speed': current_speed,
             'headwind': headwind,
             'crosswind': crosswind,
-            'bank_angle': current_bank
+            'bank_angle': current_bank,
+            'asymmetric_mode': self.asymmetric_mode,
+            'engine_throttles': engine_throttles,  # None если симметричный режим, dict если асимметричный
+            'has_engine_failure': has_engine_failure
         }
 
     def get_status(self) -> Dict[str, any]:

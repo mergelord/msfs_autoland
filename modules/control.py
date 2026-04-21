@@ -138,10 +138,61 @@ class MSFSControl:
             logger.error("Error setting gear: %s", e)
 
     def set_throttle(self, percent: float):
-        """Установить газ (0.0 - 1.0)"""
+        """
+        Установить газ на всех двигателях (0.0 - 1.0)
+
+        Args:
+            percent: Процент тяги (0.0 - 1.0)
+        """
         try:
             value = int(percent * 16384)
             self.ae.event("THROTTLE_SET", value)
             logger.info("Throttle set: %s%", percent*100)
         except Exception as e:
             logger.error("Error setting throttle: %s", e)
+
+    def set_throttle_engine(self, engine_index: int, percent: float):
+        """
+        Установить газ на конкретном двигателе (0.0 - 1.0)
+
+        Args:
+            engine_index: Номер двигателя (1-4)
+            percent: Процент тяги (0.0 - 1.0)
+        """
+        try:
+            value = int(percent * 16384)
+
+            # SimConnect события для индивидуальных двигателей
+            event_map = {
+                1: "THROTTLE1_SET",
+                2: "THROTTLE2_SET",
+                3: "THROTTLE3_SET",
+                4: "THROTTLE4_SET"
+            }
+
+            if engine_index not in event_map:
+                logger.error(f"Invalid engine index: {engine_index} (must be 1-4)")
+                return
+
+            self.ae.event(event_map[engine_index], value)
+            logger.info(f"Engine {engine_index} throttle set: {percent*100:.1f}%")
+
+        except Exception as e:
+            logger.error(f"Error setting engine {engine_index} throttle: {e}")
+
+    def set_throttle_asymmetric(self, throttle_values: dict):
+        """
+        Установить асимметричную тягу (разные значения для каждого двигателя)
+
+        Args:
+            throttle_values: Словарь {engine_index: percent}
+                            Например: {1: 0.8, 2: 0.0, 3: 0.8, 4: 0.0}
+        """
+        try:
+            for engine_idx, percent in throttle_values.items():
+                self.set_throttle_engine(engine_idx, percent)
+
+            logger.info(f"Asymmetric throttle set: {throttle_values}")
+
+        except Exception as e:
+            logger.error(f"Error setting asymmetric throttle: {e}")

@@ -453,10 +453,21 @@ class FinalPhaseState(ApproachPhaseState):
             )
 
             # Применение тяги
-            if self.system.vjoy_throttle and self.system.vjoy_throttle.enabled:
-                self.system.vjoy_throttle.set_throttle(throttle_data['throttle'])
+            if throttle_data.get('asymmetric_mode', False):
+                # Асимметричный режим - управление каждым двигателем отдельно
+                engine_throttles = throttle_data.get('engine_throttles', {})
+                if engine_throttles:
+                    logger.warning(f"Applying asymmetric thrust: {engine_throttles}")
+                    self.system.control.set_throttle_asymmetric(engine_throttles)
+                else:
+                    # Fallback на симметричную тягу
+                    self.system.control.set_throttle(throttle_data['throttle'])
             else:
-                self.system.control.set_throttle(throttle_data['throttle'])
+                # Симметричный режим - все двигатели одинаково
+                if self.system.vjoy_throttle and self.system.vjoy_throttle.enabled:
+                    self.system.vjoy_throttle.set_throttle(throttle_data['throttle'])
+                else:
+                    self.system.control.set_throttle(throttle_data['throttle'])
 
             if throttle_data['is_stable']:
                 logger.debug("Autothrottle: %s% (stable)", throttle_data['throttle']*100)

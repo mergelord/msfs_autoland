@@ -571,16 +571,17 @@ class LandingPhaseState(ApproachPhaseState):
 
         # Расчёт параметров выравнивания
         flare_params = self.system.flare_controller.calculate_flare_parameters(
-            radio_height, current_pitch, current_vs, ground_speed
+            radio_height, current_pitch, current_vs, ground_speed,
+            engine_failure_detector=self.system.engine_failure_detector if hasattr(self.system, 'engine_failure_detector') else None
         )
 
         flare_status = self.system.flare_controller.get_flare_status(radio_height)
         logger.info("LANDING: %s, Pitch %s°, VS %sfpm", flare_status, current_pitch, current_vs)
 
         if flare_params['flare_active']:
-            self._perform_active_flare(flare_params, current_pitch, current_vs)
+            self._perform_active_flare(flare_params, current_pitch, current_vs, telemetry)
         else:
-            self._maintain_glideslope(radio_height)
+            self._maintain_glideslope(radio_height, flare_params)
 
         # Завершение посадки
         if radio_height < 3:
@@ -599,7 +600,7 @@ class LandingPhaseState(ApproachPhaseState):
         else:
             return self.system.approach_config.approach_speed - 5
 
-    def _perform_active_flare(self, flare_params: dict, current_pitch: float, current_vs: float):
+    def _perform_active_flare(self, flare_params: dict, current_pitch: float, current_vs: float, telemetry: dict):
         """Выполнение активного выравнивания"""
 
         target_pitch = flare_params['target_pitch']
@@ -618,17 +619,51 @@ class LandingPhaseState(ApproachPhaseState):
             self.system.virtual_joystick.set_elevator(elevator_input)
             logger.debug("Flare vJoy: elevator=%s", elevator_input)
 
-        # Управление газом
-        self.system.control.set_throttle(flare_params['throttle'])
+        # Управление газом с поддержкой асимметричной тяги
+        if flare_params.get('has_engine_failure', False):
+            # Асимметричная тяга при отказе двигателя
+            engine_throttles = flare_params.get('engine_throttles', {})
+            if engine_throttles:
+                logger.warning(f"Flare with engine failure: applying asymmetric thrust {engine_throttles}")
+                self.system.control.set_throttle_asymmetric(engine_throttles)
+
+                # Компенсация рулём направления
+                if hasattr(self.system, 'rudder_compensation') and self.system.rudder_compensation:
+                    current_speed = telemetry['speed'].get('airspeed_indicated', 140)
+                    self.system.rudder_compensation.apply_compensation(
+                        engine_throttles,
+                        current_speed,
+                        self.system.control
+                    )
+            else:
+                # Fallback на симметричную тягу
+                self.system.control.set_throttle(flare_params['throttle'])
+        else:
+            # Симметричная тяга - нормальный режим
+            self.system.control.set_throttle(flare_params['throttle'])
 
         # Логирование прогресса
         if flare_params['progress'] > 0.1:
             logger.info("Flare progress: %.0f%%, Target pitch: %.1f°, Target VS: %.0ffpm",
                        flare_params['progress']*100, target_pitch, flare_params['target_vs'])
 
-    def _maintain_glideslope(self, radio_height: float):
+    def _maintain_glideslope(self, radio_height: float, flare_params: dict):
         """Поддержание глиссады до начала выравнивания"""
 
         if radio_height < 50:
             throttle = 0.3 * (radio_height / 50.0)
-            self.system.control.set_throttle(throttle)
+
+            # Проверка на отказ двигателей
+            if flare_params.get('has_engine_failure', False):
+                engine_throttles = flare_params.get('engine_throttles', {})
+                if engine_throttles:
+                    # Применяем асимметричную тягу
+                    asymmetric_throttles = {
+                        idx: throttle * (engine_throttles[idx] / flare_params['throttle'])
+                        for idx in engine_throttles.keys()
+                    }
+                    self.system.control.set_throttle_asymmetric(asymmetric_throttles)
+                else:
+                    self.system.control.set_throttle(throttle)
+            else:
+                self.system.control.set_throttle(throttle)

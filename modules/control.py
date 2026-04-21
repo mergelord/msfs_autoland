@@ -196,3 +196,22 @@ class MSFSControl:
 
         except Exception as e:
             logger.error(f"Error setting asymmetric throttle: {e}")
+
+    def set_rudder(self, percent: float):
+        """
+        Установить руль направления (-1.0 до +1.0)
+
+        Args:
+            percent: Положение руля
+                    -1.0 = полностью вправо
+                     0.0 = нейтраль
+                    +1.0 = полностью влево
+        """
+        try:
+            # SimConnect использует диапазон -16384 до +16384
+            value = int(percent * 16384)
+            self.ae.event("RUDDER_SET", value)
+            logger.debug(f"Rudder set: {percent:+.2f} ({value})")
+
+        except Exception as e:
+            logger.error(f"Error setting rudder: {e}")

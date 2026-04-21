@@ -77,7 +77,8 @@ class FlareController:
                                    current_pitch: float,
                                    current_vs: float,
                                    ground_speed: float,
-                                   dt: float = 0.5) -> Dict[str, float]:
+                                   dt: float = 0.5,
+                                   engine_failure_detector=None) -> Dict[str, float]:
         """
         Расчёт параметров выравнивания
 
@@ -87,6 +88,7 @@ class FlareController:
             current_vs: Текущая вертикальная скорость (футы/мин)
             ground_speed: Путевая скорость (узлы)
             dt: Временной шаг (секунды)
+            engine_failure_detector: Детектор отказов двигателей (опционально)
 
         Returns:
             Dict с командами управления
@@ -96,7 +98,9 @@ class FlareController:
                 'flare_active': False,
                 'target_pitch': current_pitch,
                 'target_vs': current_vs,
-                'throttle': None
+                'throttle': None,
+                'engine_throttles': None,
+                'has_engine_failure': False
             }
 
         # Прогресс выравнивания (0.0 = начало, 1.0 = конец)
@@ -134,6 +138,24 @@ class FlareController:
             throttle = self.config.min_throttle
             target_pitch = self.config.target_pitch
 
+        # Проверка отказов двигателей и расчёт асимметричной тяги
+        engine_throttles = None
+        has_engine_failure = False
+
+        if engine_failure_detector and engine_failure_detector.has_engine_failure():
+            has_engine_failure = True
+
+            # Расчёт асимметричной тяги
+            corrections = engine_failure_detector.calculate_asymmetric_thrust_correction()
+            engine_throttles = {}
+
+            for i in range(1, engine_failure_detector.number_of_engines + 1):
+                correction = corrections.get(f'engine_{i}', 1.0)
+                engine_throttles[i] = throttle * correction
+
+            logger.warning(f"Flare with engine failure: base_throttle={throttle:.2f}, "
+                          f"asymmetric={engine_throttles}")
+
         logger.debug(f"Flare: h={radio_height:.1f}ft, progress={progress:.2f}, "
                     f"pitch={current_pitch:.1f}°→{target_pitch:.1f}°, "
                     f"VS={current_vs:.0f}→{target_vs:.0f}fpm, throttle={throttle:.2f}")
@@ -143,7 +165,9 @@ class FlareController:
             'target_pitch': target_pitch,
             'target_vs': target_vs,
             'throttle': throttle,
-            'progress': progress
+            'progress': progress,
+            'engine_throttles': engine_throttles,
+            'has_engine_failure': has_engine_failure
         }
 
     def calculate_pitch_input(self, current_pitch: float, target_pitch: float,

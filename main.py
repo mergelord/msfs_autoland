@@ -268,11 +268,31 @@ class AutoLandSystem:
             self.dme_navigation.add_dme_fix(fix)
         logger.info("Added %s DME fixes", len(fixes))
 
+    def _reset_approach_session_state(self) -> None:
+        """Сбросить per-approach состояние для чистого старта нового захода.
+
+        Идемпотентно: безопасно вызывать повторно.
+        Не рвёт подключение к MSFS, профили и connection monitor.
+        """
+        self.takeover_initiated = False
+        self._ils_info_logged = False
+        self.autopilot_takeover.reset()
+        if hasattr(self, 'autothrottle') and hasattr(self.autothrottle, 'reset'):
+            self.autothrottle.reset()
+        if hasattr(self, 'flare_controller') and hasattr(self.flare_controller, 'reset'):
+            self.flare_controller.reset()
+        if hasattr(self, 'stabilized_monitor') and hasattr(self.stabilized_monitor, 'reset'):
+            self.stabilized_monitor.reset()
+        logger.info("Approach session state reset")
+
     def start_approach(self):
         """Начать заход на посадку"""
         if not self.approach_config:
             logger.error("Approach not configured")
             return
+
+        # Сброс per-approach состояния перед новым заходом
+        self._reset_approach_session_state()
 
         self.running = True
         self.phase = ApproachPhase.INITIAL

@@ -1,37 +1,45 @@
 """
 Модуль автоматической передачи управления от автопилота к AutoLand системе
+
+WP-2: Hard safety gates — провал блокирует команды.
+WP-3: Readback-verified takeover — подтверждение через observed state.
 """
 
 import logging
 import time
-from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+# ── Hard vs retryable check classification ────────────────────────
+
+_HARD_FAIL_CHECKS = frozenset({"airborne", "attitude_safe"})
+_RETRYABLE_CHECKS = frozenset({"speed_stable", "altitude_stable", "altitude_safe"})
 
 
 @dataclass
 class TakeoverConfig:
     """Конфигурация передачи управления"""
     # Расстояния и высоты для VOR/NDB заходов
-    takeover_distance_nm: float = 10.0  # Расстояние до порога ВПП
-    takeover_altitude_min: float = 1500.0  # Минимальная высота AGL
-    takeover_altitude_max: float = 4000.0  # Максимальная высота AGL
+    takeover_distance_nm: float = 10.0
+    takeover_altitude_min: float = 1500.0
+    takeover_altitude_max: float = 4000.0
 
     # Высоты для ILS CAT I/II заходов (передача на DH)
-    ils_cat1_dh: float = 200.0  # Decision Height CAT I (футы)
-    ils_cat2_dh: float = 100.0  # Decision Height CAT II (футы)
-    ils_takeover_enabled: bool = True  # Включить передачу для ILS на DH
+    ils_cat1_dh: float = 200.0
+    ils_cat2_dh: float = 100.0
+    ils_takeover_enabled: bool = True
 
     # Таймауты
-    initialization_timeout: float = 30.0  # Секунды на инициализацию
-    stabilization_timeout: float = 10.0  # Секунды на стабилизацию
+    initialization_timeout: float = 30.0
+    stabilization_timeout: float = 10.0
 
     # Проверки безопасности
-    require_stable_speed: bool = True  # Требовать стабильную скорость
-    require_stable_altitude: bool = True  # Требовать стабильную высоту
-    speed_tolerance: float = 10.0  # Допуск скорости (узлы)
-    altitude_tolerance: float = 200.0  # Допуск высоты (футы)
+    require_stable_speed: bool = True
+    require_stable_altitude: bool = True
+    speed_tolerance: float = 10.0
+    altitude_tolerance: float = 200.0
 
 
 @dataclass
@@ -49,23 +57,26 @@ class TakeoverStatus:
     autothrottle_disengaged: bool = False
     controls_acquired: bool = False
 
-    checks_passed: Dict[str, bool] = None
+    checks_passed: Dict[str, bool] = field(default_factory=dict)
     error_message: str = ""
+    failure_reason: str = ""
+    waiting_for: Tuple[str, ...] = ()
     timestamp: float = 0.0
-
-    def __post_init__(self):
-        if self.checks_passed is None:
-            self.checks_passed = {}
 
 
 class AutopilotTakeover:
     """Контроллер автоматической передачи управления"""
 
-    def __init__(self, config: Optional[TakeoverConfig] = None):
+    def __init__(self, config: Optional[TakeoverConfig] = None,
+                 clock=None):
         self.config = config or TakeoverConfig()
         self.status = TakeoverStatus()
-        self.takeover_start_time = None
-        self.initial_parameters = {}
+        self.takeover_start_time: Optional[float] = None
+        self.initial_parameters: Dict = {}
+        self._commands_sent = False
+        self._clock = clock or time.monotonic
+
+    # ── public API ────────────────────────────────────────────────
 
     def should_initiate_takeover(self,
                                  distance_to_threshold: float,
@@ -74,144 +85,127 @@ class AutopilotTakeover:
                                  approach_type: str = None,
                                  decision_height: float = None,
                                  ils_category: str = None) -> bool:
-        """
-        Определить нужно ли начинать передачу управления
-
-        Args:
-            distance_to_threshold: Расстояние до порога ВПП (NM)
-            altitude_agl: Высота над землёй (футы)
-            approach_phase: Текущая фаза захода
-            approach_type: Тип захода (ILS, VOR, NDB, GPS)
-            decision_height: Decision Height для ILS (футы)
-            ils_category: Категория ILS (CAT_I, CAT_II, CAT_III)
-
-        Returns:
-            True если нужно начинать передачу управления
-        """
-        # Не начинаем если уже в процессе или завершено
         if self.status.in_progress or self.status.completed:
             return False
 
-        # Логика для ILS заходов CAT I/II
         if approach_type and approach_type.upper() == 'ILS':
             if not self.config.ils_takeover_enabled:
-                logger.debug("ILS takeover disabled in config")
                 return False
 
-            # Определение Decision Height
             if decision_height is None:
-                # Определяем по категории
-                if ils_category == 'CAT_II':
-                    decision_height = self.config.ils_cat2_dh
-                else:  # CAT_I или не указано
-                    decision_height = self.config.ils_cat1_dh
+                decision_height = (self.config.ils_cat2_dh
+                                   if ils_category == 'CAT_II'
+                                   else self.config.ils_cat1_dh)
 
-            # Проверка высоты для ILS: передача управления на DH + 50 футов
-            # (небольшой запас для инициализации)
             takeover_height = decision_height + 50.0
 
             if altitude_agl <= takeover_height and altitude_agl > decision_height:
-                # Дополнительная проверка фазы
                 if approach_phase in ['FINAL', 'LANDING']:
-                    logger.info(f"ILS takeover conditions met at DH: "
-                               f"altitude={altitude_agl:.0f}ft, DH={decision_height:.0f}ft, "
-                               f"category={ils_category or 'CAT_I'}")
+                    logger.info("ILS takeover conditions met at DH: "
+                                "altitude=%.0fft, DH=%.0fft, category=%s",
+                                altitude_agl, decision_height,
+                                ils_category or 'CAT_I')
                     return True
             return False
 
-        # Логика для VOR/NDB заходов (как раньше)
         if approach_type and approach_type.upper() not in ['VOR', 'NDB']:
-            logger.debug(f"Takeover skipped: approach type {approach_type} does not require manual control "
-                        f"(only VOR/NDB/ILS require takeover)")
             return False
 
-        # Проверка расстояния для VOR/NDB
         distance_ok = distance_to_threshold <= self.config.takeover_distance_nm
-
-        # Проверка высоты для VOR/NDB
         altitude_ok = (self.config.takeover_altitude_min <= altitude_agl <=
-                      self.config.takeover_altitude_max)
-
-        # Проверка фазы (должны быть на заходе, но не в посадке)
+                       self.config.takeover_altitude_max)
         phase_ok = approach_phase in ['INTERMEDIATE', 'FINAL']
 
         if distance_ok and altitude_ok and phase_ok:
-            logger.info(f"Takeover conditions met for {approach_type} approach: "
-                       f"distance={distance_to_threshold:.1f}nm, "
-                       f"altitude={altitude_agl:.0f}ft, phase={approach_phase}")
+            logger.info("Takeover conditions met for %s: dist=%.1fnm, "
+                        "alt=%.0fft, phase=%s",
+                        approach_type, distance_to_threshold,
+                        altitude_agl, approach_phase)
             return True
 
         return False
 
     def perform_takeover(self,
-                        telemetry: Dict,
-                        aircraft_adapter,
-                        control) -> TakeoverStatus:
-        """
-        Выполнить передачу управления
-
-        Args:
-            telemetry: Данные телеметрии
-            aircraft_adapter: Адаптер самолёта
-            control: Контроллер управления
-
-        Returns:
-            Статус передачи управления
-        """
+                         telemetry: Dict,
+                         aircraft_adapter,
+                         control) -> TakeoverStatus:
         if not self.status.in_progress:
             self._start_takeover()
 
-        # Проверка таймаута
-        if time.time() - self.takeover_start_time > self.config.initialization_timeout:
+        # ── Timeout (monotonic) ───────────────────────────────────
+        now = self._clock()
+        if now - self.takeover_start_time > self.config.initialization_timeout:
             self.status.failed = True
             self.status.error_message = "Takeover timeout exceeded"
+            self.status.failure_reason = "timeout"
             logger.error("Takeover failed: timeout")
             return self.status
 
-        # Шаг 1: Сохранение начальных параметров
+        # ── Save initial params ───────────────────────────────────
         if not self.initial_parameters:
             self._save_initial_parameters(telemetry)
 
-        # Шаг 2: Выполнение проверок безопасности
+        # ── Safety checks ─────────────────────────────────────────
         checks = self._perform_safety_checks(telemetry)
         self.status.checks_passed = checks
 
-        if not all(checks.values()):
-            failed_checks = [k for k, v in checks.items() if not v]
-            logger.warning("Safety checks failed: %s", ', '.join(failed_checks))
-            # Не прерываем, продолжаем попытки
+        hard_fails = [k for k, v in checks.items()
+                      if not v and k in _HARD_FAIL_CHECKS]
+        retryable_fails = [k for k, v in checks.items()
+                           if not v and k in _RETRYABLE_CHECKS]
 
-        # Шаг 3: Отключение автопилота
-        if not self.status.autopilot_disengaged:
-            self._disengage_autopilot(aircraft_adapter, control)
+        # Hard fail → abort, no commands
+        if hard_fails:
+            self.status.failed = True
+            self.status.failure_reason = "hard_safety"
+            self.status.error_message = (
+                f"Hard safety check failed: {', '.join(hard_fails)}")
+            logger.error("TAKEOVER ABORTED — hard safety: %s",
+                         ', '.join(hard_fails))
+            return self.status
 
-        # Шаг 4: Отключение автомата тяги
-        if not self.status.autothrottle_disengaged:
-            self._disengage_autothrottle(aircraft_adapter, control)
+        # Retryable fail → wait, don't send commands yet
+        if retryable_fails and not self._commands_sent:
+            self.status.waiting_for = tuple(retryable_fails)
+            logger.info("Takeover waiting for: %s",
+                         ', '.join(retryable_fails))
+            return self.status
 
-        # Шаг 5: Захват управления
-        if not self.status.controls_acquired:
+        self.status.waiting_for = ()
+
+        # ── Send commands (only once) ─────────────────────────────
+        if not self._commands_sent:
+            self._send_disengage_commands(aircraft_adapter, control)
+            self._commands_sent = True
+
+        # ── Readback verification (WP-3) ──────────────────────────
+        self._verify_readback(aircraft_adapter, control)
+
+        # ── Acquire controls after AP/AT verified off ─────────────
+        if (self.status.autopilot_disengaged and
+                self.status.autothrottle_disengaged and
+                not self.status.controls_acquired):
             self._acquire_controls(control)
 
-        # Шаг 6: Проверка завершения
+        # ── Complete ──────────────────────────────────────────────
         if (self.status.autopilot_disengaged and
-            self.status.autothrottle_disengaged and
-            self.status.controls_acquired):
+                self.status.autothrottle_disengaged and
+                self.status.controls_acquired):
             self._complete_takeover()
 
         return self.status
 
+    # ── private helpers ───────────────────────────────────────────
+
     def _start_takeover(self):
-        """Начать процесс передачи управления"""
         self.status.in_progress = True
-        self.takeover_start_time = time.time()
+        self.takeover_start_time = self._clock()
         self.status.timestamp = self.takeover_start_time
         logger.info("=" * 60)
         logger.info("AUTOPILOT TAKEOVER INITIATED")
         logger.info("=" * 60)
 
     def _save_initial_parameters(self, telemetry: Dict):
-        """Сохранить начальные параметры для сравнения"""
         self.initial_parameters = {
             'altitude': telemetry['position']['altitude'],
             'altitude_agl': telemetry['position']['altitude_agl'],
@@ -221,128 +215,108 @@ class AutopilotTakeover:
             'bank': telemetry['attitude']['bank'],
             'vertical_speed': telemetry['speed']['vertical_speed']
         }
-        logger.info(f"Initial parameters saved: IAS={self.initial_parameters['airspeed']:.0f}kt, "
-                   f"ALT={self.initial_parameters['altitude']:.0f}ft, "
-                   f"HDG={self.initial_parameters['heading']:.0f}°")
+        logger.info("Initial parameters saved: IAS=%.0fkt, ALT=%.0fft, HDG=%.0f°",
+                     self.initial_parameters['airspeed'],
+                     self.initial_parameters['altitude'],
+                     self.initial_parameters['heading'])
 
     def _perform_safety_checks(self, telemetry: Dict) -> Dict[str, bool]:
-        """
-        Выполнить проверки безопасности
+        checks: Dict[str, bool] = {}
 
-        Returns:
-            Dict с результатами проверок
-        """
-        checks = {}
-
-        # 1. Проверка высоты
         altitude_agl = telemetry['position']['altitude_agl']
         checks['altitude_safe'] = altitude_agl >= self.config.takeover_altitude_min
 
-        # 2. Проверка скорости (если требуется)
         if self.config.require_stable_speed and self.initial_parameters:
             current_speed = telemetry['speed']['airspeed_indicated']
             initial_speed = self.initial_parameters['airspeed']
-            speed_change = abs(current_speed - initial_speed)
-            checks['speed_stable'] = speed_change <= self.config.speed_tolerance
+            checks['speed_stable'] = (
+                abs(current_speed - initial_speed) <= self.config.speed_tolerance)
         else:
             checks['speed_stable'] = True
 
-        # 3. Проверка высоты (если требуется)
         if self.config.require_stable_altitude and self.initial_parameters:
             current_alt = telemetry['position']['altitude']
             initial_alt = self.initial_parameters['altitude']
-            alt_change = abs(current_alt - initial_alt)
-            checks['altitude_stable'] = alt_change <= self.config.altitude_tolerance
+            checks['altitude_stable'] = (
+                abs(current_alt - initial_alt) <= self.config.altitude_tolerance)
         else:
             checks['altitude_stable'] = True
 
-        # 4. Проверка положения самолёта
         bank = abs(telemetry['attitude']['bank'])
         pitch = telemetry['attitude']['pitch']
         checks['attitude_safe'] = bank < 30 and -10 < pitch < 15
 
-        # 5. Проверка на земле
         on_ground = telemetry['position'].get('on_ground', False)
         checks['airborne'] = not on_ground
 
         return checks
 
-    def _disengage_autopilot(self, aircraft_adapter, control):
-        """Отключить автопилот"""
-        try:
-            logger.info("Disengaging autopilot...")
+    def _send_disengage_commands(self, aircraft_adapter, control):
+        """Отправить команды выключения AP/A/T (без подтверждения)."""
+        logger.info("Sending disengage commands...")
 
-            # Попытка через aircraft adapter (для кастомных самолётов)
-            if aircraft_adapter and hasattr(aircraft_adapter, 'disengage_autopilot'):
-                success = aircraft_adapter.disengage_autopilot()
-                if success:
-                    logger.info("✓ Autopilot disengaged via aircraft adapter")
-                    self.status.autopilot_disengaged = True
-                    return
+        # Try adapter first
+        if aircraft_adapter and hasattr(aircraft_adapter, 'disengage_autopilot'):
+            aircraft_adapter.disengage_autopilot()
 
-            # Fallback: стандартный SimConnect
-            control.set_autopilot_master(False)
+        # SimConnect fallback
+        control.set_autopilot_master(False)
+        control.set_heading_hold(False)
+        control.set_altitude_hold(False)
+        control.set_airspeed_hold(False)
+        control.set_vertical_speed_hold(False)
 
-            # Отключение всех режимов автопилота
-            control.set_heading_hold(False)
-            control.set_altitude_hold(False)
-            control.set_airspeed_hold(False)
-            control.set_vertical_speed_hold(False)
+        if aircraft_adapter and hasattr(aircraft_adapter, 'disengage_autothrottle'):
+            aircraft_adapter.disengage_autothrottle()
 
-            logger.info("✓ Autopilot disengaged via SimConnect")
+        logger.info("Disengage commands sent")
+
+    def _verify_readback(self, aircraft_adapter, control):
+        """WP-3: Проверить readback AP/A/T статуса.
+
+        Adapter readback приоритетнее generic control readback.
+        None = неизвестно → fail-closed (не ставим True).
+        """
+        # AP readback
+        ap_readback = None
+        if aircraft_adapter and hasattr(aircraft_adapter, 'get_autopilot_engaged'):
+            ap_readback = aircraft_adapter.get_autopilot_engaged()
+        if ap_readback is None and hasattr(control, 'get_autopilot_engaged'):
+            ap_readback = control.get_autopilot_engaged()
+
+        if ap_readback is False:
             self.status.autopilot_disengaged = True
+        elif ap_readback is True:
+            self.status.autopilot_disengaged = False
+        # None → leave as-is (fail-closed)
 
-        except Exception as e:
-            logger.error("Failed to disengage autopilot: %s", e)
-            # Продолжаем попытки в следующем цикле
+        # AT readback
+        at_readback = None
+        if aircraft_adapter and hasattr(aircraft_adapter, 'get_autothrottle_engaged'):
+            at_readback = aircraft_adapter.get_autothrottle_engaged()
+        if at_readback is None and hasattr(control, 'get_autothrottle_engaged'):
+            at_readback = control.get_autothrottle_engaged()
 
-    def _disengage_autothrottle(self, aircraft_adapter, control):
-        """Отключить автомат тяги"""
-        try:
-            logger.info("Disengaging autothrottle...")
-
-            # Попытка через aircraft adapter (для кастомных самолётов)
-            if aircraft_adapter and hasattr(aircraft_adapter, 'disengage_autothrottle'):
-                success = aircraft_adapter.disengage_autothrottle()
-                if success:
-                    logger.info("✓ Autothrottle disengaged via aircraft adapter")
-                    self.status.autothrottle_disengaged = True
-                    return
-
-            # Fallback: стандартный SimConnect
-            # Для стандартных самолётов автомат тяги обычно часть автопилота
-            # Устанавливаем ручное управление тягой
-            logger.info("✓ Autothrottle control transferred (SimConnect)")
+        if at_readback is False:
             self.status.autothrottle_disengaged = True
-
-        except Exception as e:
-            logger.error("Failed to disengage autothrottle: %s", e)
-            # Продолжаем попытки в следующем цикле
+        elif at_readback is True:
+            self.status.autothrottle_disengaged = False
+        # None → leave as-is (fail-closed)
 
     def _acquire_controls(self, control):
-        """Захватить управление самолётом"""
         try:
             logger.info("Acquiring flight controls...")
-
-            # Центрирование управления (нейтральное положение)
-            # Это предотвращает резкие движения при передаче управления
-
-            # Примечание: В реальности SimConnect автоматически передаёт управление
-            # когда мы начинаем отправлять команды. Здесь мы просто логируем.
-
-            logger.info("✓ Flight controls acquired")
+            logger.info("Flight controls acquired")
             self.status.controls_acquired = True
-
         except Exception as e:
             logger.error("Failed to acquire controls: %s", e)
 
     def _complete_takeover(self):
-        """Завершить передачу управления"""
         self.status.in_progress = False
         self.status.completed = True
         self.status.ready = True
 
-        elapsed = time.time() - self.takeover_start_time
+        elapsed = self._clock() - self.takeover_start_time
 
         logger.info("=" * 60)
         logger.info("AUTOPILOT TAKEOVER COMPLETED (%ss)", elapsed)
@@ -350,104 +324,62 @@ class AutopilotTakeover:
         logger.info("=" * 60)
 
     def get_status_summary(self) -> str:
-        """Получить текстовую сводку статуса"""
         if self.status.failed:
             return f"FAILED: {self.status.error_message}"
         elif self.status.completed:
             return "COMPLETED - AutoLand in control"
         elif self.status.in_progress:
             steps = []
-            if self.status.autopilot_disengaged:
-                steps.append("AP✓")
-            else:
-                steps.append("AP...")
-
-            if self.status.autothrottle_disengaged:
-                steps.append("AT✓")
-            else:
-                steps.append("AT...")
-
-            if self.status.controls_acquired:
-                steps.append("CTRL✓")
-            else:
-                steps.append("CTRL...")
-
+            steps.append("AP✓" if self.status.autopilot_disengaged else "AP...")
+            steps.append("AT✓" if self.status.autothrottle_disengaged else "AT...")
+            steps.append("CTRL✓" if self.status.controls_acquired else "CTRL...")
             return f"IN PROGRESS: {' '.join(steps)}"
         else:
             return "READY"
 
     def reset(self):
-        """Сброс состояния"""
         self.status = TakeoverStatus()
         self.takeover_start_time = None
         self.initial_parameters = {}
+        self._commands_sent = False
         logger.info("Takeover controller reset")
 
     def get_recommended_takeover_point(self,
-                                      approach_type: str,
-                                      runway_length_m: int,
-                                      weather_conditions: Dict,
-                                      decision_height: float = None) -> Tuple[float, float]:
-        """
-        Рассчитать рекомендуемую точку передачи управления
+                                       approach_type: str,
+                                       runway_length_m: int,
+                                       weather_conditions: Dict,
+                                       decision_height: float = None) -> Tuple[float, float]:
+        distance = 10.0
+        altitude = 3000.0
 
-        Args:
-            approach_type: Тип захода (ILS, VOR, NDB, GPS)
-            runway_length_m: Длина ВПП (метры)
-            weather_conditions: Погодные условия
-            decision_height: Decision Height для ILS (футы)
-
-        Returns:
-            (distance_nm, altitude_agl) - рекомендуемая точка
-        """
-        # Базовые значения
-        distance = 10.0  # NM
-        altitude = 3000.0  # футы AGL
-
-        # Коррекция по типу захода
         if approach_type == 'ILS':
-            # ILS - передача управления на Decision Height для flare
-            # Автопилот самолёта ведёт до DH, затем AutoLand берёт управление
             if decision_height:
-                altitude = decision_height + 50.0  # DH + 50 футов запаса
+                altitude = decision_height + 50.0
             else:
-                altitude = 250.0  # По умолчанию CAT I (200 ft DH + 50 ft)
-
-            # Расстояние не важно для ILS (передача по высоте)
+                altitude = 250.0
             distance = 0.0
-
-            logger.info("ILS approach: takeover at DH+50ft = %sft AGL", altitude)
-
         elif approach_type in ['VOR', 'NDB']:
-            # VOR/NDB - нужно больше времени на стабилизацию
             distance = 10.0
             altitude = 3500.0
         elif approach_type == 'GPS':
-            # GPS - средняя точность
             distance = 9.0
             altitude = 3000.0
 
-        # Коррекция по длине ВПП (только для VOR/NDB)
         if approach_type in ['VOR', 'NDB'] and runway_length_m < 1500:
-            # Короткая ВПП - начинаем раньше
             distance += 2.0
             altitude += 500.0
 
-        # Коррекция по погоде (только для VOR/NDB)
         if approach_type in ['VOR', 'NDB']:
             wind_speed = weather_conditions.get('wind_velocity', 0)
             visibility = weather_conditions.get('visibility', 10000)
-
             if wind_speed > 20:
-                # Сильный ветер - больше времени на стабилизацию
                 distance += 1.0
                 altitude += 500.0
-
             if visibility < 5000:
-                # Плохая видимость - начинаем раньше
                 distance += 1.0
 
-        logger.info(f"Recommended takeover point: {distance:.1f}nm, {altitude:.0f}ft AGL "
-                   f"(approach={approach_type}, runway={runway_length_m}m)")
+        logger.info("Recommended takeover point: %.1fnm, %.0fft AGL "
+                     "(approach=%s, runway=%dm)",
+                     distance, altitude, approach_type, runway_length_m)
 
         return distance, altitude

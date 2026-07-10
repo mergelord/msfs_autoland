@@ -717,3 +717,21 @@ class AircraftCommandAdapter:
             'manufacturer': profile_info.get('manufacturer'),
             'autothrottle': profile_info.get('autothrottle_supported')
         }
+
+    # ── Readback methods (WP-3 / FIX-1) ──────────────────────────
+
+    def get_autopilot_engaged(self) -> Optional[bool]:
+        """Readback: AP включён?
+
+        Базовая реализация возвращает None (fallback → control readback).
+        Кастомные адаптеры (PMDG, Fenix) могут переопределить через LVars.
+        """
+        return None
+
+    def get_autothrottle_engaged(self) -> Optional[bool]:
+        """Readback: A/T включён?
+
+        Базовая реализация возвращает None (fallback → control readback).
+        Кастомные адаптеры (PMDG, Fenix) могут переопределить через LVars.
+        """
+        return None

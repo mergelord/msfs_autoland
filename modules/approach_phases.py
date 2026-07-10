@@ -7,6 +7,8 @@ import logging
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Optional
 
+from modules.control_ownership import ControlOwner, compute_ownership
+
 if TYPE_CHECKING:
     from main import AutoLandSystem
 
@@ -206,7 +208,9 @@ class IntermediatePhaseState(ApproachPhaseState):
         takeover_status = self.system.autopilot_takeover.perform_takeover(
             telemetry=telemetry,
             aircraft_adapter=self.system.aircraft_adapter,
-            control=self.system.control
+            control=self.system.control,
+            approach_type=self.system.approach_config.station.type,
+            decision_height=self.system.approach_config.decision_height,
         )
 
         # Логирование прогресса
@@ -249,6 +253,16 @@ class FinalPhaseState(ApproachPhaseState):
         if not self._check_weather_conditions(telemetry, wind_data, radio_height):
             return None  # Go around executed
 
+        # WP-5 / FIX-4: compute control ownership
+        self._ownership = compute_ownership(
+            phase="FINAL",
+            confirmed_takeover=self.system.autopilot_takeover.status.completed,
+            use_vjoy=self.system.use_vjoy,
+            vjoy_ready=(hasattr(self.system.virtual_joystick, 'enabled')
+                        and self.system.virtual_joystick.enabled),
+            use_autothrottle=self.system.use_autothrottle,
+        )
+
         # Расчёт и логирование параметров захода
         self._log_approach_parameters(telemetry, approach_data, wind_data, radio_height)
 
@@ -267,6 +281,15 @@ class FinalPhaseState(ApproachPhaseState):
 
         # Переход к посадке
         if radio_height < self.system.approach_config.decision_height:
+            # WP-4 DH guard: ниже DH без confirmed takeover → go-around
+            if (self.system.use_ils and
+                    not self.system.autopilot_takeover.status.completed):
+                logger.critical(
+                    "DH GUARD: Below DH (%.0fft) without confirmed takeover "
+                    "- GO AROUND", radio_height)
+                self.system.execute_go_around()
+                return None
+
             if not self._check_final_stabilization(radio_height):
                 return None  # Go around executed
 
@@ -313,7 +336,9 @@ class FinalPhaseState(ApproachPhaseState):
         takeover_status = self.system.autopilot_takeover.perform_takeover(
             telemetry=telemetry,
             aircraft_adapter=self.system.aircraft_adapter,
-            control=self.system.control
+            control=self.system.control,
+            approach_type=self.system.approach_config.station.type,
+            decision_height=self.system.approach_config.decision_height,
         )
 
         status_summary = self.system.autopilot_takeover.get_status_summary()
@@ -395,11 +420,17 @@ class FinalPhaseState(ApproachPhaseState):
     def _control_aircraft(self, telemetry: dict, wind_data: dict):
         """Управление самолётом (курс, крен, тангаж)"""
 
+        ownership = getattr(self, '_ownership', None)
         corrected_heading = wind_data['corrected_heading']
-        self.system.control.set_heading_hold(int(corrected_heading))
 
-        # Если vJoy доступен, используем прямое управление
-        if self.system.use_vjoy:
+        # AP commands only when roll/pitch owner is AIRCRAFT_AP
+        if ownership is None or ownership.roll == ControlOwner.AIRCRAFT_AP:
+            self.system.control.set_heading_hold(int(corrected_heading))
+
+        # vJoy commands only when roll/pitch owner is EXTERNAL
+        if (self.system.use_vjoy and
+                ownership is not None and
+                ownership.roll == ControlOwner.EXTERNAL):
             current_bank = telemetry['attitude']['bank']
             current_pitch = telemetry['attitude']['pitch']
             current_heading = telemetry['attitude']['heading_magnetic']
@@ -423,17 +454,14 @@ class FinalPhaseState(ApproachPhaseState):
                 rudder=0.0
             )
 
-            logger.debug("vJoy: Bank %.1f°→%.1f°, Pitch %.1f°→%.1f°, "
-                       "Aileron %.2f, Elevator %.2f",
-                       current_bank, target_bank, current_pitch, target_pitch,
-                       aileron_input, elevator_input)
-
-        # Вертикальная скорость
-        vs = wind_data['corrected_vs']
-        self.system.control.set_vertical_speed(-int(vs))
+        # Вертикальная скорость — only if pitch owner is AP
+        if ownership is None or ownership.pitch == ControlOwner.AIRCRAFT_AP:
+            vs = wind_data['corrected_vs']
+            self.system.control.set_vertical_speed(-int(vs))
 
     def _control_throttle(self, telemetry: dict, wind_data: dict):
-        """Управление тягой"""
+        """Управление тягой — с учётом ownership (WP-5)."""
+        ownership = getattr(self, '_ownership', None)
 
         if self.system.use_autothrottle and self.system.autothrottle.active:
             # Определение целевой скорости
@@ -452,27 +480,30 @@ class FinalPhaseState(ApproachPhaseState):
                 aircraft_weight
             )
 
-            # Применение тяги
-            if throttle_data.get('asymmetric_mode', False):
-                # Асимметричный режим - управление каждым двигателем отдельно
-                engine_throttles = throttle_data.get('engine_throttles', {})
-                if engine_throttles:
-                    logger.warning(f"Applying asymmetric thrust: {engine_throttles}")
-                    self.system.control.set_throttle_asymmetric(engine_throttles)
+            # Применение тяги — only if throttle owner is AIRCRAFT_AP
+            if ownership is None or ownership.throttle == ControlOwner.AIRCRAFT_AP:
+                if throttle_data.get('asymmetric_mode', False):
+                    engine_throttles = throttle_data.get('engine_throttles', {})
+                    if engine_throttles:
+                        logger.warning("Applying asymmetric thrust: %s", engine_throttles)
+                        self.system.control.set_throttle_asymmetric(engine_throttles)
+                    else:
+                        self.system.control.set_throttle(throttle_data['throttle'])
                 else:
-                    # Fallback на симметричную тягу
-                    self.system.control.set_throttle(throttle_data['throttle'])
-            else:
-                # Симметричный режим - все двигатели одинаково
-                if self.system.vjoy_throttle and self.system.vjoy_throttle.enabled:
-                    self.system.vjoy_throttle.set_throttle(throttle_data['throttle'])
-                else:
-                    self.system.control.set_throttle(throttle_data['throttle'])
+                    if self.system.vjoy_throttle and self.system.vjoy_throttle.enabled:
+                        self.system.vjoy_throttle.set_throttle(throttle_data['throttle'])
+                    else:
+                        self.system.control.set_throttle(throttle_data['throttle'])
 
-            if throttle_data.get('is_stable', False):
-                logger.debug("Autothrottle: %.1f%% (stable)", throttle_data['throttle']*100)
+                if throttle_data.get('is_stable', False):
+                    logger.debug("Autothrottle: %.1f%% (stable)", throttle_data['throttle']*100)
         else:
-            self.system.control.set_throttle(0.5)
+            # No autothrottle — EXTERNAL owns throttle if vJoy ready
+            if (ownership is not None and
+                    ownership.throttle == ControlOwner.EXTERNAL):
+                pass  # vJoy throttle handled externally
+            else:
+                self.system.control.set_throttle(0.5)
 
     def _get_aircraft_weight(self, telemetry: dict) -> float:
         """Получение веса самолёта"""

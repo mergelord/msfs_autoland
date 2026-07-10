@@ -101,7 +101,7 @@ class AutoLandSystem:
     def connect(self) -> bool:
         """Подключение к MSFS"""
         if self.telemetry.connect():
-            self.control = MSFSControl(self.telemetry.ae)
+            self.control = MSFSControl(self.telemetry.ae, self.telemetry.aq)
 
             # Инициализация FMS reader
             self.fms_reader = FMSReader(self.telemetry)
@@ -238,9 +238,13 @@ class AutoLandSystem:
         telemetry = self.telemetry.get_all_data()
         weather = telemetry.get('weather', {})
 
+        # WP-6: ApproachConfig.runway_length is in FEET; convert to meters
+        runway_length_ft = config.runway_length if hasattr(config, 'runway_length') else 8000
+        runway_length_m = runway_length_ft / 3.28084  # feet → meters
+
         recommended_distance, recommended_altitude = self.autopilot_takeover.get_recommended_takeover_point(
             approach_type=config.station.type,
-            runway_length_m=config.runway_length if hasattr(config, 'runway_length') else 2500,
+            runway_length_m=int(runway_length_m),
             weather_conditions=weather,
             decision_height=config.decision_height if config.station.type == 'ILS' else None
         )
@@ -268,11 +272,31 @@ class AutoLandSystem:
             self.dme_navigation.add_dme_fix(fix)
         logger.info("Added %s DME fixes", len(fixes))
 
+    def _reset_approach_session_state(self) -> None:
+        """Сбросить per-approach состояние для чистого старта нового захода.
+
+        Идемпотентно: безопасно вызывать повторно.
+        Не рвёт подключение к MSFS, профили и connection monitor.
+        """
+        self.takeover_initiated = False
+        self._ils_info_logged = False
+        self.autopilot_takeover.reset()
+        if hasattr(self, 'autothrottle') and hasattr(self.autothrottle, 'reset'):
+            self.autothrottle.reset()
+        if hasattr(self, 'flare_controller') and hasattr(self.flare_controller, 'reset'):
+            self.flare_controller.reset()
+        if hasattr(self, 'stabilized_monitor') and hasattr(self.stabilized_monitor, 'reset'):
+            self.stabilized_monitor.reset()
+        logger.info("Approach session state reset")
+
     def start_approach(self):
         """Начать заход на посадку"""
         if not self.approach_config:
             logger.error("Approach not configured")
             return
+
+        # Сброс per-approach состояния перед новым заходом
+        self._reset_approach_session_state()
 
         self.running = True
         self.phase = ApproachPhase.INITIAL

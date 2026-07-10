@@ -13,8 +13,9 @@ logger = logging.getLogger(__name__)
 class MSFSControl:
     """Класс для управления самолётом через SimConnect"""
 
-    def __init__(self, aircraft_events: AircraftEvents):
+    def __init__(self, aircraft_events: AircraftEvents, aircraft_requests=None):
         self.ae = aircraft_events
+        self._aq = aircraft_requests  # Optional: для readback SimVars
 
     def set_autopilot_master(self, state: bool):
         """Включить/выключить автопилот"""
@@ -234,3 +235,33 @@ class MSFSControl:
 
         except Exception as e:
             logger.error(f"Error setting aileron: {e}")
+
+    # ── Readback methods (WP-3 / FIX-1) ──────────────────────────
+
+    def get_autopilot_engaged(self) -> Optional[bool]:
+        """Readback: AP включён?
+
+        Returns:
+            True = AP observed on, False = AP observed off,
+            None = cannot read (SimVar unavailable).
+        """
+        if self._aq is None:
+            return None
+        try:
+            return bool(self._aq.get("AUTOPILOT_MASTER"))
+        except Exception:
+            return None
+
+    def get_autothrottle_engaged(self) -> Optional[bool]:
+        """Readback: A/T включён?
+
+        Returns:
+            True = AT observed on, False = AT observed off,
+            None = cannot read (SimVar unavailable).
+        """
+        if self._aq is None:
+            return None
+        try:
+            return bool(self._aq.get("AUTOPILOT_THROTTLE_ARM"))
+        except Exception:
+            return None

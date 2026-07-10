@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 
 _HARD_FAIL_CHECKS = frozenset({"airborne", "attitude_safe"})
 _RETRYABLE_CHECKS = frozenset({"speed_stable", "altitude_stable", "altitude_safe"})
+# sink_rate_safe is mode-dependent: hard for ILS, retryable for VOR/NDB
+# Added dynamically in _perform_safety_checks() based on approach_type
 
 
 @dataclass
@@ -40,6 +42,7 @@ class TakeoverConfig:
     require_stable_altitude: bool = True
     speed_tolerance: float = 10.0
     altitude_tolerance: float = 200.0
+    sink_rate_max: float = 1000.0  # Max descent rate in fpm (negative = descent)
 
 
 @dataclass
@@ -160,10 +163,17 @@ class AutopilotTakeover:
         checks = self._perform_safety_checks(telemetry, approach_type, decision_height)
         self.status.checks_passed = checks
 
+        # Classify sink_rate_safe: hard for ILS, retryable for VOR/NDB
+        is_ils = approach_type and approach_type.upper() == 'ILS'
         hard_fails = [k for k, v in checks.items()
                       if not v and k in _HARD_FAIL_CHECKS]
+        if is_ils and not checks.get('sink_rate_safe', True):
+            hard_fails.append('sink_rate_safe')
+
         retryable_fails = [k for k, v in checks.items()
                            if not v and k in _RETRYABLE_CHECKS]
+        if not is_ils and not checks.get('sink_rate_safe', True):
+            retryable_fails.append('sink_rate_safe')
 
         # Hard fail → abort, no commands
         if hard_fails:
@@ -271,6 +281,12 @@ class AutopilotTakeover:
 
         on_ground = telemetry['position'].get('on_ground', False)
         checks['airborne'] = not on_ground
+
+        # 6. Sink rate guard — mode-dependent classification
+        vertical_speed = telemetry['speed']['vertical_speed']
+        checks['sink_rate_safe'] = vertical_speed >= -self.config.sink_rate_max
+        # Note: sink_rate_safe classification (hard vs retryable) is determined
+        # by approach_type in perform_takeover(), not here.
 
         return checks
 

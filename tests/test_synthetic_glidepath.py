@@ -266,7 +266,7 @@ class TestMDAClampAfterWindCorrection:
 
         If clamp were before wind correction, sign would matter.
         Since clamp is after, both positive and negative wind VS
-        are clamped to ≤ 0 within the hysteresis band.
+        are clamped to exactly 0 within the hysteresis band.
         """
         config = _make_config(runway_elevation=500, decision_height=500)
         nav = _make_nav_mock(
@@ -281,9 +281,9 @@ class TestMDAClampAfterWindCorrection:
         r_positive = gp.compute_target_vs(t, wind_correction_vs=1000.0)
         r_negative = gp.compute_target_vs(t, wind_correction_vs=-200.0)
 
-        # Both must be ≤ 0 within hysteresis band
-        assert r_positive <= 0.0, f"Positive wind VS not clamped: {r_positive}"
-        assert r_negative <= 0.0, f"Negative wind VS not clamped: {r_negative}"
+        # Both must be exactly 0 within hysteresis band (level-off, no climb)
+        assert r_positive == 0.0, f"Positive wind VS not clamped to 0: {r_positive}"
+        assert r_negative == 0.0, f"Negative wind VS not clamped to 0: {r_negative}"
 
 
 # ── On-profile tracking ─────────────────────────────────────────────
@@ -474,7 +474,7 @@ class TestMDAHysteresis:
         telemetry = _make_telemetry(altitude_msl=1110.0)
         result = gp.compute_target_vs(telemetry, wind_correction_vs=600.0)
 
-        assert result <= 0.0, f"Expected no descent in hysteresis band, got {result}"
+        assert result == 0.0, f"Expected level-off (0) in hysteresis band, got {result}"
 
     def test_outside_hysteresis_band_descends(self):
         """Above MDA_MSL + hysteresis → no clamp, normal descent."""
@@ -491,6 +491,58 @@ class TestMDAHysteresis:
 
         # error = 1130 - 1400 = -270 → correction = -540 → 600 + (-540) = 60
         assert abs(result - 60.0) < 1.0
+
+
+class TestMDAHysteresisExactZero:
+    """Hysteresis band returns exactly 0.0 — not min(raw, 0).
+
+    Two explicit scenarios to prevent regression to min(raw_vs, 0.0)
+    which would allow climb commands (negative VS) near MDA.
+    """
+
+    def test_positive_raw_vs_in_band(self):
+        """Wind pushes descent (positive raw VS) inside band → 0.
+
+        runway_elevation=500, decision_height=500 → MDA_MSL=1000.
+        Hysteresis=15 → band = [1000, 1015].
+        Aircraft at 1010 MSL → within band.
+        wind_correction_vs=1000 → raw_vs = 1000 + (-380) = 620.
+        Expected: 0.0 (not 620, not min(620,0)=0 by luck).
+        """
+        config = _make_config(runway_elevation=500, decision_height=500)
+        nav = _make_nav_mock(
+            distance_to_threshold=1.0,
+            required_altitude_msl=1200.0,
+            runway_elevation=500.0,
+        )
+        gp = SyntheticGlidepath(nav, config, mda_hysteresis_ft=15.0, gain=2.0)
+
+        t = _make_telemetry(altitude_msl=1010.0, runway_elevation=500.0)
+        result = gp.compute_target_vs(t, wind_correction_vs=1000.0)
+
+        assert result == 0.0, (
+            f"Positive raw VS in hysteresis band: expected 0.0, got {result}")
+
+    def test_negative_raw_vs_in_band(self):
+        """Profile/wind pulls climb (negative raw VS) inside band → 0.
+
+        Same setup. wind_correction_vs=-200 → raw_vs = -200 + (-380) = -580.
+        With min(raw, 0) this would pass (-580 ≤ 0) but still allow climb.
+        With raw_vs = 0.0 it correctly holds altitude.
+        """
+        config = _make_config(runway_elevation=500, decision_height=500)
+        nav = _make_nav_mock(
+            distance_to_threshold=1.0,
+            required_altitude_msl=1200.0,
+            runway_elevation=500.0,
+        )
+        gp = SyntheticGlidepath(nav, config, mda_hysteresis_ft=15.0, gain=2.0)
+
+        t = _make_telemetry(altitude_msl=1010.0, runway_elevation=500.0)
+        result = gp.compute_target_vs(t, wind_correction_vs=-200.0)
+
+        assert result == 0.0, (
+            f"Negative raw VS in hysteresis band: expected 0.0, got {result}")
 
 
 # ── Neighbour test: ILS ────────────────────────────────────────────
@@ -686,4 +738,4 @@ class TestEdgeCases:
         telemetry = _make_telemetry(altitude_msl=1105.0)
         result = gp.compute_target_vs(telemetry, wind_correction_vs=200.0)
 
-        assert result <= 0.0, f"Expected no descent near MDA, got {result}"
+        assert result == 0.0, f"Expected level-off (0) near MDA, got {result}"

@@ -149,10 +149,11 @@ class SyntheticGlidepath:
         raw_vs = wind_correction_vs + vs_correction
 
         # ── MDA floor clamp (MSL, last stage after wind correction) ─
-        # Within hysteresis band: prevent descent (level off).
-        # raw_vs > 0 means descent; clamp to 0 so we asymptotically
-        # approach the floor without breaking through it.
+        # Within hysteresis band: hold altitude exactly.
+        # Must be exactly 0.0 — not min(raw_vs, 0) which would allow
+        # negative VS (climb command) when the aircraft is below the
+        # glideslope but within the MDA band.
         if altitude_msl <= self._mda_msl + self._mda_hysteresis:
-            raw_vs = min(raw_vs, 0.0)
+            raw_vs = 0.0
 
         return raw_vs

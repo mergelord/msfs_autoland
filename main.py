@@ -230,11 +230,17 @@ class AutoLandSystem:
             self.use_ils = True
             self.synthetic_glidepath = None
             logger.info("ILS approach configured: %s", config.station.name)
-        else:
+        elif config.station.type in ('VOR', 'NDB'):
             self.use_ils = False
             self.synthetic_glidepath = SyntheticGlidepath(self.navigation, config)
             logger.info("Approach configured: %s - %s (synthetic glidepath active)",
                         config.station.name, config.station.type)
+        else:
+            self.use_ils = False
+            self.synthetic_glidepath = None
+            logger.warning("Unsupported approach type '%s' for %s — "
+                           "synthetic glidepath disabled",
+                           config.station.type, config.station.name)
 
         # Расчёт параметров скорости захода
         self._calculate_approach_speeds(config)

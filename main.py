@@ -230,7 +230,7 @@ class AutoLandSystem:
             self.use_ils = True
             self.synthetic_glidepath = None
             logger.info("ILS approach configured: %s", config.station.name)
-        elif config.station.type in ('VOR', 'NDB'):
+        elif config.station.type in ('VOR', 'NDB', 'LOC'):
             self.use_ils = False
             self.synthetic_glidepath = SyntheticGlidepath(self.navigation, config)
             logger.info("Approach configured: %s - %s (synthetic glidepath active)",
@@ -327,6 +327,9 @@ class AutoLandSystem:
         if self.approach_config.station.type == 'ILS':
             self.control.set_nav_frequency(1, self.approach_config.station.frequency)
             logger.info("ILS frequency set: %s MHz", self.approach_config.station.frequency/1000000)
+        elif self.approach_config.station.type == 'LOC':
+            self.control.set_nav_frequency(1, self.approach_config.station.frequency)
+            logger.info("LOC frequency set: %s MHz", self.approach_config.station.frequency/1000000)
         elif self.approach_config.station.type == 'VOR':
             self.control.set_nav_frequency(1, self.approach_config.station.frequency)
             self.control.set_obs(1, self.approach_config.final_approach_course)
@@ -606,7 +609,7 @@ class AutoLandSystem:
             self.connection_monitor.perform_active_test()
 
     def _calculate_approach_data(self, data: dict) -> dict:
-        """Расчёт параметров захода (ILS или VOR/NDB)"""
+        """Расчёт параметров захода (ILS, LOC или VOR/NDB)"""
         position = data['position']
         attitude = data['attitude']
         nav = data['nav']
@@ -614,6 +617,10 @@ class AutoLandSystem:
 
         if self.use_ils and ils.get('nav1_has_localizer'):
             return self.ils_navigation.calculate_ils_approach(data, ils)
+        elif (self.approach_config is not None
+              and self.approach_config.station.type == 'LOC'
+              and ils.get('nav1_has_localizer')):
+            return self.ils_navigation.calculate_loc_approach(data, ils)
         else:
             return self.navigation.calculate_vor_approach(
                 {**position, **attitude},

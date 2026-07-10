@@ -32,6 +32,7 @@ class TakeoverConfig:
     require_stable_altitude: bool = True  # Требовать стабильную высоту
     speed_tolerance: float = 10.0  # Допуск скорости (узлы)
     altitude_tolerance: float = 200.0  # Допуск высоты (футы)
+    sink_rate_max: float = 1000.0  # Максимальная вертикальная скорость снижения (футы/мин)
 
 
 @dataclass
@@ -179,7 +180,17 @@ class AutopilotTakeover:
         if not all(checks.values()):
             failed_checks = [k for k, v in checks.items() if not v]
             logger.warning("Safety checks failed: %s", ', '.join(failed_checks))
-            # Не прерываем, продолжаем попытки
+
+            # Hard fail: sink rate exceeded — abort takeover immediately
+            if not checks.get('sink_rate_safe', True):
+                self.status.failed = True
+                self.status.error_message = (
+                    f"Sink rate {telemetry['speed']['vertical_speed']:.0f} fpm "
+                    f"exceeds limit {-self.config.sink_rate_max:.0f} fpm"
+                )
+                logger.error("TAKEOVER ABORTED — unsafe sink rate: %s fpm",
+                             telemetry['speed']['vertical_speed'])
+                return self.status
 
         # Шаг 3: Отключение автопилота
         if not self.status.autopilot_disengaged:
@@ -264,6 +275,11 @@ class AutopilotTakeover:
         # 5. Проверка на земле
         on_ground = telemetry['position'].get('on_ground', False)
         checks['airborne'] = not on_ground
+
+        # 6. Проверка вертикальной скорости (sink rate guard)
+        vertical_speed = telemetry['speed']['vertical_speed']
+        # Отрицательное значение = снижение, проверяем что не превышает максимум
+        checks['sink_rate_safe'] = vertical_speed >= -self.config.sink_rate_max
 
         return checks
 

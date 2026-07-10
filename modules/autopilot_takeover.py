@@ -137,7 +137,9 @@ class AutopilotTakeover:
     def perform_takeover(self,
                          telemetry: Dict,
                          aircraft_adapter,
-                         control) -> TakeoverStatus:
+                         control,
+                         approach_type: str = None,
+                         decision_height: float = None) -> TakeoverStatus:
         if not self.status.in_progress:
             self._start_takeover()
 
@@ -154,20 +156,8 @@ class AutopilotTakeover:
         if not self.initial_parameters:
             self._save_initial_parameters(telemetry)
 
-        # ── Hard fail: below minimum altitude (not retryable) ─────
-        altitude_agl = telemetry['position']['altitude_agl']
-        if altitude_agl < self.config.takeover_altitude_min:
-            self.status.failed = True
-            self.status.failure_reason = "hard_safety"
-            self.status.error_message = (
-                f"Below minimum altitude: {altitude_agl:.0f}ft "
-                f"< {self.config.takeover_altitude_min:.0f}ft")
-            logger.error("Takeover ABORTED — below minimum altitude: %.0fft",
-                         altitude_agl)
-            return self.status
-
         # ── Safety checks ─────────────────────────────────────────
-        checks = self._perform_safety_checks(telemetry)
+        checks = self._perform_safety_checks(telemetry, approach_type, decision_height)
         self.status.checks_passed = checks
 
         hard_fails = [k for k, v in checks.items()
@@ -241,11 +231,23 @@ class AutopilotTakeover:
                      self.initial_parameters['altitude'],
                      self.initial_parameters['heading'])
 
-    def _perform_safety_checks(self, telemetry: Dict) -> Dict[str, bool]:
+    def _perform_safety_checks(self, telemetry: Dict,
+                                approach_type: str = None,
+                                decision_height: float = None) -> Dict[str, bool]:
         checks: Dict[str, bool] = {}
 
         altitude_agl = telemetry['position']['altitude_agl']
-        checks['altitude_safe'] = altitude_agl >= self.config.takeover_altitude_min
+
+        # FIX-9: compute altitude_safe by approach mode
+        if approach_type and approach_type.upper() == 'ILS':
+            if decision_height is None:
+                # fail-closed: ILS without DH → altitude not safe
+                checks['altitude_safe'] = False
+            else:
+                checks['altitude_safe'] = altitude_agl > decision_height
+        else:
+            # VOR/NDB/NPA: use takeover_altitude_min floor
+            checks['altitude_safe'] = altitude_agl >= self.config.takeover_altitude_min
 
         if self.config.require_stable_speed and self.initial_parameters:
             current_speed = telemetry['speed']['airspeed_indicated']

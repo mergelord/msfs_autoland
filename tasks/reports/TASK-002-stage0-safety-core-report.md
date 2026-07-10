@@ -59,7 +59,7 @@ DONE
 
 ### pytest tests/ -q
 ```text
-59 passed, 1 warning in 0.57s
+62 passed, 1 warning in 0.52s
 ```
 
 ### pytest tests/test_takeover_safety.py -v
@@ -102,3 +102,6 @@ tests/test_takeover_safety.py::TestProductionReadback::test_adapter_readback_ret
 - **FIX-4:** Ownership интегрирован в `FinalPhaseState.handle()`. `_control_aircraft()` и `_control_throttle()` проверяют ownership. Тест переписан на production path.
 - **FIX-5:** Убран несуществующий флаг `allow_unverified_takeover` из отчёта. Добавлен раздел «Live-ограничения».
 - **FIX-6:** Добавлен комментарий в код и строка в отчёте о retryable-проверках после отправки команд.
+- **FIX-7:** below-minimum hard fail + dead branch cleanup + FakeClock в тесте.
+- **FIX-8:** Удалён мёртвый `crossed`分支, `_prev_altitude_agl` оставлен как задел.
+- **FIX-9:** Восстановлен ILS DH takeover path. Убран глобальный `altitude_agl < takeover_altitude_min → hard_safety` из `perform_takeover()`. Добавлены `approach_type` / `decision_height` параметры. `altitude_safe` вычисляется по режиму: ILS → `altitude_agl > decision_height`; VOR/NDB → `altitude_agl >= takeover_altitude_min`. Тесты: 4 new (ILS happy path 244ft, ILS below-DH DH guard, ILS без DH fail-closed, NPA regression).

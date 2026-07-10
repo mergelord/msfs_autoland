@@ -49,18 +49,21 @@ class TestILSCrossingDetection:
         )
         assert result is True, "Takeover should trigger at 244ft (crossing DH+50)"
 
-    def test_large_step_across_entire_window_starts_or_aborts_safely(self):
-        """FIX-7: 270 → 190: fail-closed с конкретным mechanism.
+    def test_large_step_below_dh_triggers_dh_guard_go_around(self):
+        """FIX-9: 270 → 190: production DH guard → go-around.
 
-        Below DH without completed takeover → altitude_safe fails
-        (190 < takeover_altitude_min=1500), not timeout.
+        Below DH without completed takeover → DH guard in
+        FinalPhaseState.handle() triggers execute_go_around().
+        AutopilotTakeover.perform_takeover() does NOT fail with
+        hard_safety (that check was removed in FIX-9).
         """
+        from unittest.mock import MagicMock
+        from modules.approach_phases import FinalPhaseState
+
         clock = FakeClock(start=1000.0)
         takeover = _make_takeover_for_ils(clock=clock)
 
-        assert 190 < DH, "190ft should be below DH"
-
-        # Simulate: below DH, no completed takeover
+        # Simulate: takeover initiated at 244ft (in window), now at 190ft
         takeover.status.in_progress = True
         takeover.takeover_start_time = clock()
         takeover.initial_parameters = {"airspeed": 140, "altitude": 3000}
@@ -68,16 +71,47 @@ class TestILSCrossingDetection:
         ctrl = FakeControl()
         adapter = FakeAircraftAdapter()
 
+        # perform_takeover at 190ft should NOT fail with hard_safety
         telemetry = make_telemetry(altitude_agl=190, radio_height=190, bank=0)
-        status = takeover.perform_takeover(telemetry, adapter, ctrl)
+        status = takeover.perform_takeover(telemetry, adapter, ctrl,
+                                           approach_type="ILS",
+                                           decision_height=DH)
 
-        # Assert specific mechanism: hard_safety, NOT timeout
-        assert status.failed is True
-        assert status.failure_reason == "hard_safety"
-        assert "altitude" in status.error_message.lower() or \
-               "minimum" in status.error_message.lower()
-        assert not ctrl.has_call("set_autopilot_master"), \
-            "No AP commands should be sent on hard safety failure"
+        # FIX-9: no hard_safety failure — altitude check was removed
+        assert status.failed is False, \
+            "perform_takeover should not fail at 190ft for ILS"
+        assert status.failure_reason != "hard_safety"
+
+        # Now test DH guard via FinalPhaseState.handle()
+        system = MagicMock()
+        system.use_ils = True
+        system.approach_config.decision_height = DH
+        system.approach_config.station.type = 'ILS'
+        system.autopilot_takeover = takeover
+        system.takeover_initiated = True
+        system.wind_shear_detector.update.return_value = None
+        turb_mock = MagicMock()
+        turb_mock.intensity = 'SMOOTH'
+        system.turbulence_detector.update.return_value = turb_mock
+        system.navigation.calculate_distance_to_threshold.return_value = 0.5
+
+        phase = FinalPhaseState(system)
+
+        telemetry_fh = make_telemetry(altitude_agl=190, radio_height=190, bank=0)
+        approach_data = {"distance_to_station": 0.5,
+                         "cross_track_error": 0.0,
+                         "on_course": True}
+        wind_data = {"wind_speed": 5, "wind_direction": 270,
+                     "crosswind": 0, "headwind": 5,
+                     "corrected_heading": 270, "corrected_vs": 700,
+                     "drift_angle": 0}
+
+        result = phase.handle(telemetry_fh, approach_data, wind_data)
+
+        # DH guard should trigger go-around
+        system.execute_go_around.assert_called_once()
+        # Takeover should NOT be completed
+        assert takeover.status.completed is False
 
     def test_first_snapshot_below_dh_without_takeover_fails_closed(self):
         """Первый snapshot уже ниже DH → immediate fail-closed."""
@@ -229,6 +263,112 @@ class TestILSCrossingDetection:
 
         # Should trigger go-around
         system.execute_go_around.assert_called_once()
+
+    def test_ils_takeover_at_244ft_completes_with_readback(self):
+        """FIX-9 regression: ILS CAT I, DH=200, altitude_agl=244.
+
+        default takeover_altitude_min=1500 does NOT block ILS.
+        should_initiate_takeover() → True, perform_takeover() → not failed,
+        with readback AP/AT → completed.
+        """
+        clock = FakeClock(start=1000.0)
+        takeover = _make_takeover_for_ils(clock=clock)
+
+        # Step 1: should_initiate_takeover at 244ft (in window DH..DH+50)
+        result = takeover.should_initiate_takeover(
+            distance_to_threshold=0.0,
+            altitude_agl=244.0,
+            approach_phase="FINAL",
+            approach_type="ILS",
+            decision_height=DH,
+            ils_category="CAT_I",
+        )
+        assert result is True, "Takeover should initiate at 244ft"
+
+        # Step 2: perform_takeover — must NOT fail with hard_safety
+        ctrl = FakeControl()
+        adapter = FakeAircraftAdapter()
+
+        # Production-like readback: AP/AT report disengaged after command
+        ctrl.set_readback_ap(False)
+        ctrl.set_readback_at(False)
+        adapter._ap_state = False
+        adapter._at_state = False
+
+        telemetry = make_telemetry(altitude_agl=244, radio_height=244, bank=0)
+        status = takeover.perform_takeover(telemetry, adapter, ctrl,
+                                           approach_type="ILS",
+                                           decision_height=DH)
+
+        # Must NOT fail — especially not with hard_safety
+        assert status.failed is False, \
+            f"ILS takeover at 244ft should not fail, got: {status.failure_reason}"
+        assert status.failure_reason != "hard_safety", \
+            "hard_safety must not trigger for ILS at 244ft with default min=1500"
+
+        # With positive readback, takeover should complete
+        assert status.completed is True, \
+            "ILS takeover should complete with AP/AT readback confirmed"
+
+        # Verify AP/AT commands were actually sent
+        assert ctrl.has_call("set_autopilot_master"), \
+            "AP disengage command should be sent"
+        assert ctrl.has_call("set_airspeed_hold"), \
+            "AT-related command should be sent"
+
+    def test_ils_without_decision_height_fail_closed(self):
+        """FIX-9: ILS without decision_height → altitude_safe=False, no commands."""
+        clock = FakeClock(start=1000.0)
+        takeover = _make_takeover_for_ils(clock=clock)
+
+        takeover.status.in_progress = True
+        takeover.takeover_start_time = clock()
+        takeover.initial_parameters = {"airspeed": 140, "altitude": 3000}
+
+        ctrl = FakeControl()
+        adapter = FakeAircraftAdapter()
+
+        # ILS without decision_height → fail-closed
+        telemetry = make_telemetry(altitude_agl=244, radio_height=244, bank=0)
+        status = takeover.perform_takeover(telemetry, adapter, ctrl,
+                                           approach_type="ILS",
+                                           decision_height=None)
+
+        # altitude_safe should be False (fail-closed)
+        assert status.checks_passed.get('altitude_safe') is False
+        # Commands should NOT be sent
+        assert not ctrl.has_call("set_autopilot_master"), \
+            "No AP commands should be sent when ILS without DH"
+
+    def test_npa_below_minimum_blocks_takeover_commands(self):
+        """FIX-9 NPA regression: VOR/NDB, AGL < takeover_altitude_min.
+
+        altitude_safe stays False, takeover commands not sent.
+        """
+        clock = FakeClock(start=1000.0)
+        config = TakeoverConfig(
+            takeover_altitude_min=1500.0,
+            initialization_timeout=60.0,
+        )
+        takeover = AutopilotTakeover(config=config, clock=clock)
+
+        takeover.status.in_progress = True
+        takeover.takeover_start_time = clock()
+        takeover.initial_parameters = {"airspeed": 140, "altitude": 3000}
+
+        ctrl = FakeControl()
+        adapter = FakeAircraftAdapter()
+
+        # VOR at 800ft AGL — below takeover_altitude_min=1500
+        telemetry = make_telemetry(altitude_agl=800, radio_height=800, bank=0)
+        status = takeover.perform_takeover(telemetry, adapter, ctrl,
+                                           approach_type="VOR")
+
+        # altitude_safe should be False (800 < 1500)
+        assert status.checks_passed.get('altitude_safe') is False
+        # Commands should NOT be sent
+        assert not ctrl.has_call("set_autopilot_master"), \
+            "No AP commands should be sent below NPA minimum"
 
 
 class TestCrossingDetection:

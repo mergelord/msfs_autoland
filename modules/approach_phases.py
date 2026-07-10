@@ -208,7 +208,9 @@ class IntermediatePhaseState(ApproachPhaseState):
         takeover_status = self.system.autopilot_takeover.perform_takeover(
             telemetry=telemetry,
             aircraft_adapter=self.system.aircraft_adapter,
-            control=self.system.control
+            control=self.system.control,
+            approach_type=self.system.approach_config.station.type,
+            decision_height=self.system.approach_config.decision_height,
         )
 
         # Логирование прогресса
@@ -334,7 +336,9 @@ class FinalPhaseState(ApproachPhaseState):
         takeover_status = self.system.autopilot_takeover.perform_takeover(
             telemetry=telemetry,
             aircraft_adapter=self.system.aircraft_adapter,
-            control=self.system.control
+            control=self.system.control,
+            approach_type=self.system.approach_config.station.type,
+            decision_height=self.system.approach_config.decision_height,
         )
 
         status_summary = self.system.autopilot_takeover.get_status_summary()

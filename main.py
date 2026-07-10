@@ -30,6 +30,7 @@ from modules.structured_logger import LogCategory, init_logger
 from modules.telemetry import MSFSTelemetry
 from modules.turbulence_detector import TurbulenceDetector
 from modules.virtual_joystick import VirtualJoystick
+from modules.synthetic_glidepath import SyntheticGlidepath
 from modules.wind_correction import WindCorrection
 from modules.wind_shear_detector import WindShearDetector
 
@@ -83,6 +84,7 @@ class AutoLandSystem:
         self.connection_monitor: Optional[ConnectionMonitor] = None
         self.speed_calculator = ApproachSpeedCalculator()
         self.autopilot_takeover = AutopilotTakeover()
+        self.synthetic_glidepath: Optional[SyntheticGlidepath] = None
         self.approach_config: Optional[ApproachConfig] = None
         self.approach_params: Optional[dict] = None
         self.takeover_initiated: bool = False
@@ -226,10 +228,13 @@ class AutoLandSystem:
         # Определение типа захода
         if config.station.type == 'ILS':
             self.use_ils = True
+            self.synthetic_glidepath = None
             logger.info("ILS approach configured: %s", config.station.name)
         else:
             self.use_ils = False
-            logger.info("Approach configured: %s - %s", config.station.name, config.station.type)
+            self.synthetic_glidepath = SyntheticGlidepath(self.navigation, config)
+            logger.info("Approach configured: %s - %s (synthetic glidepath active)",
+                        config.station.name, config.station.type)
 
         # Расчёт параметров скорости захода
         self._calculate_approach_speeds(config)

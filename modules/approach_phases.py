@@ -456,7 +456,12 @@ class FinalPhaseState(ApproachPhaseState):
 
         # Вертикальная скорость — only if pitch owner is AP
         if ownership is None or ownership.pitch == ControlOwner.AIRCRAFT_AP:
-            vs = wind_data['corrected_vs']
+            if self.system.synthetic_glidepath is not None:
+                vs = self.system.synthetic_glidepath.compute_target_vs(
+                    telemetry, wind_data['corrected_vs']
+                )
+            else:
+                vs = wind_data['corrected_vs']
             self.system.control.set_vertical_speed(-int(vs))
 
     def _control_throttle(self, telemetry: dict, wind_data: dict):

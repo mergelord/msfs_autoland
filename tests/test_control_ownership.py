@@ -118,11 +118,27 @@ class TestControlOwnership:
         assert ownership.throttle == ControlOwner.AIRCRAFT_AP
 
     def test_no_competing_ap_and_vjoy_commands(self):
-        """Когда EXTERNAL — нет AP heading_hold/vertical_speed команд."""
+        """FIX-4: Production _control_aircraft() respects ownership.
+
+        When EXTERNAL owns roll/pitch, AP commands should NOT be sent.
+        Test calls real FinalPhaseState._control_aircraft() with fakes.
+        """
+        from unittest.mock import MagicMock
+        from modules.approach_phases import FinalPhaseState
+
         ctrl = FakeControl()
         vjoy = FakeVJoy()
+        vjoy.enabled = True
 
-        ownership = compute_ownership(
+        system = MagicMock()
+        system.control = ctrl
+        system.virtual_joystick = vjoy
+        system.use_vjoy = True
+
+        phase = FinalPhaseState(system)
+
+        # Set ownership: EXTERNAL for roll/pitch
+        phase._ownership = compute_ownership(
             phase="FINAL",
             confirmed_takeover=True,
             use_vjoy=True,
@@ -130,16 +146,16 @@ class TestControlOwnership:
             use_autothrottle=True,
         )
 
-        # Simulate: if owner is EXTERNAL, don't send AP commands
-        if ownership.roll == ControlOwner.EXTERNAL:
-            # Should NOT call AP heading commands
-            pass  # Logic would be in approach_phases.py
-        if ownership.pitch == ControlOwner.EXTERNAL:
-            # Should NOT call AP vertical_speed commands
-            pass
+        telemetry = {"attitude": {"bank": 0, "pitch": 2.5, "heading_magnetic": 270}}
+        wind_data = {"corrected_heading": 270, "corrected_vs": 700}
 
-        # Only vJoy commands should be sent
-        vjoy.apply_control_inputs(aileron=0.1, elevator=0.05, rudder=0.0)
+        phase._control_aircraft(telemetry, wind_data)
+
+        # vJoy commands were sent
         assert vjoy.has_call("apply_control_inputs")
-        assert not ctrl.has_call("set_heading_hold")
-        assert not ctrl.has_call("set_vertical_speed")
+
+        # AP commands were NOT sent (EXTERNAL owns roll/pitch)
+        assert not ctrl.has_call("set_heading_hold"), \
+            "AP heading should NOT be sent when EXTERNAL owns roll"
+        assert not ctrl.has_call("set_vertical_speed"), \
+            "AP vertical_speed should NOT be sent when EXTERNAL owns pitch"

@@ -101,7 +101,7 @@ class AutoLandSystem:
     def connect(self) -> bool:
         """Подключение к MSFS"""
         if self.telemetry.connect():
-            self.control = MSFSControl(self.telemetry.ae)
+            self.control = MSFSControl(self.telemetry.ae, self.telemetry.aq)
 
             # Инициализация FMS reader
             self.fms_reader = FMSReader(self.telemetry)

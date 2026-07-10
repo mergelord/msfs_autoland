@@ -34,7 +34,7 @@ class TestHardSafetyGates:
 
         # Инициируем takeover
         takeover.status.in_progress = True
-        takeover.takeover_start_time = time.time()
+        takeover.takeover_start_time = time.monotonic()
         takeover.initial_parameters = {"airspeed": 140, "altitude": 3000}
 
         telemetry = make_telemetry(bank=31.0, altitude_agl=2500)
@@ -56,7 +56,7 @@ class TestHardSafetyGates:
         takeover = AutopilotTakeover()
 
         takeover.status.in_progress = True
-        takeover.takeover_start_time = time.time()
+        takeover.takeover_start_time = time.monotonic()
         takeover.initial_parameters = {"airspeed": 140, "altitude": 3000}
 
         telemetry = make_telemetry(on_ground=True, altitude_agl=0)
@@ -76,7 +76,7 @@ class TestHardSafetyGates:
         takeover = AutopilotTakeover(config=config)
 
         takeover.status.in_progress = True
-        takeover.takeover_start_time = time.time()
+        takeover.takeover_start_time = time.monotonic()
         takeover.initial_parameters = {"airspeed": 140, "altitude": 3000}
 
         # Скорость отличается на 20 узлов — за пределами tolerance
@@ -97,7 +97,7 @@ class TestHardSafetyGates:
         takeover = AutopilotTakeover()
 
         takeover.status.in_progress = True
-        takeover.takeover_start_time = time.time()
+        takeover.takeover_start_time = time.monotonic()
         takeover.initial_parameters = {"airspeed": 140, "altitude": 3000}
 
         # Безопасный snapshot
@@ -116,27 +116,21 @@ class TestHardSafetyGates:
         ctrl = FakeControl()
         adapter = FakeAircraftAdapter()
         config = TakeoverConfig(initialization_timeout=5.0)
-        takeover = AutopilotTakeover(config=config)
+        takeover = AutopilotTakeover(config=config, clock=clock)
 
-        # Подменяем monotonic на clock
-        original_monotonic = time.monotonic
-        time.monotonic = clock
+        takeover.status.in_progress = True
+        takeover.takeover_start_time = clock()
+        takeover.initial_parameters = {"airspeed": 140, "altitude": 3000}
 
-        try:
-            takeover.status.in_progress = True
-            takeover.takeover_start_time = clock()
-            takeover.initial_parameters = {"airspeed": 140, "altitude": 3000}
+        # Продвигаем время за timeout
+        clock.advance(10.0)
 
-            # Продвигаем время за timeout
-            clock.advance(10.0)
+        telemetry = make_telemetry(bank=0, altitude_agl=2500)
+        status = takeover.perform_takeover(telemetry, adapter, ctrl)
 
-            telemetry = make_telemetry(bank=0, altitude_agl=2500)
-            status = takeover.perform_takeover(telemetry, adapter, ctrl)
-
-            assert status.failed is True
-            assert "timeout" in status.error_message.lower()
-        finally:
-            time.monotonic = original_monotonic
+        assert status.failed is True
+        assert "timeout" in status.error_message.lower()
+        assert status.failure_reason == "timeout"
 
     def test_failure_reason_is_machine_checkable(self):
         """failure_reason — заполненная строка при failed, не пустая."""
@@ -145,7 +139,7 @@ class TestHardSafetyGates:
         takeover = AutopilotTakeover()
 
         takeover.status.in_progress = True
-        takeover.takeover_start_time = time.time()
+        takeover.takeover_start_time = time.monotonic()
         takeover.initial_parameters = {"airspeed": 140, "altitude": 3000}
 
         telemetry = make_telemetry(bank=35.0, altitude_agl=2500)
@@ -174,7 +168,7 @@ class TestReadbackVerifiedTakeover:
 
         takeover = AutopilotTakeover()
         takeover.status.in_progress = True
-        takeover.takeover_start_time = time.time()
+        takeover.takeover_start_time = time.monotonic()
         takeover.initial_parameters = {"airspeed": 140, "altitude": 3000}
 
         # Безопасный snapshot — все проверки пройдены
@@ -198,7 +192,7 @@ class TestReadbackVerifiedTakeover:
 
         takeover = AutopilotTakeover()
         takeover.status.in_progress = True
-        takeover.takeover_start_time = time.time()
+        takeover.takeover_start_time = time.monotonic()
         takeover.initial_parameters = {"airspeed": 140, "altitude": 3000}
 
         # Tick 1: readback показывает AP/AT включены
@@ -233,7 +227,7 @@ class TestReadbackVerifiedTakeover:
 
         takeover = AutopilotTakeover()
         takeover.status.in_progress = True
-        takeover.takeover_start_time = time.time()
+        takeover.takeover_start_time = time.monotonic()
         takeover.initial_parameters = {"airspeed": 140, "altitude": 3000}
 
         telemetry = make_telemetry(bank=0, altitude_agl=2500, airspeed=140)
@@ -253,7 +247,7 @@ class TestReadbackVerifiedTakeover:
 
         takeover = AutopilotTakeover()
         takeover.status.in_progress = True
-        takeover.takeover_start_time = time.time()
+        takeover.takeover_start_time = time.monotonic()
         takeover.initial_parameters = {"airspeed": 140, "altitude": 3000}
 
         telemetry = make_telemetry(bank=0, altitude_agl=2500, airspeed=140)
@@ -262,3 +256,58 @@ class TestReadbackVerifiedTakeover:
         # Adapter readback False → autopilot_disengaged должен быть True
         assert status.autopilot_disengaged is True, \
             "Adapter readback should take priority over generic fallback"
+
+
+# ═══════════════════════════════════════════════════════════════════
+# FIX-1: Production readback
+# ═══════════════════════════════════════════════════════════════════
+
+class TestProductionReadback:
+    """Production control.py и aircraft_adapter.py readback методы."""
+
+    def test_control_readback_with_aq(self):
+        """MSFSControl.get_autopilot_engaged читает SimVar через _aq."""
+        from modules.control import MSFSControl
+
+        mock_ae = MagicMock()
+        mock_aq = MagicMock()
+        mock_aq.get.return_value = True
+
+        ctrl = MSFSControl(mock_ae, mock_aq)
+        assert ctrl.get_autopilot_engaged() is True
+
+        mock_aq.get.return_value = False
+        assert ctrl.get_autopilot_engaged() is False
+
+    def test_control_readback_without_aq_returns_none(self):
+        """MSFSControl без _aq → readback возвращает None."""
+        from modules.control import MSFSControl
+
+        mock_ae = MagicMock()
+        ctrl = MSFSControl(mock_ae)  # без _aq
+
+        assert ctrl.get_autopilot_engaged() is None
+        assert ctrl.get_autothrottle_engaged() is None
+
+    def test_control_readback_exception_returns_none(self):
+        """MSFSControl readback при исключении → None (не прокидывает)."""
+        from modules.control import MSFSControl
+
+        mock_ae = MagicMock()
+        mock_aq = MagicMock()
+        mock_aq.get.side_effect = Exception("SimConnect error")
+
+        ctrl = MSFSControl(mock_ae, mock_aq)
+        assert ctrl.get_autopilot_engaged() is None
+        assert ctrl.get_autothrottle_engaged() is None
+
+    def test_adapter_readback_returns_none(self):
+        """AircraftCommandAdapter.readback → None (базовый fallback)."""
+        from modules.aircraft_adapter import AircraftCommandAdapter
+
+        mock_control = MagicMock()
+        mock_telemetry = MagicMock()
+        adapter = AircraftCommandAdapter(mock_control, mock_telemetry)
+
+        assert adapter.get_autopilot_engaged() is None
+        assert adapter.get_autothrottle_engaged() is None

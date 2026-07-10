@@ -231,3 +231,78 @@ class TestILSCrossingDetection:
 
         # Should trigger go-around
         system.execute_go_around.assert_called_once()
+
+
+class TestCrossingDetection:
+    """FIX-3: Тесты crossing detection с трекингом предыдущей высоты."""
+
+    def test_large_step_crossing_window_initiates(self):
+        """FIX-3: 320 → 230: crossing DH+50 (250) triggers takeover.
+
+        Без crossing detection: 230 попадает в окно → initiate.
+        С crossing detection: crossing тоже ловится.
+        """
+        takeover = _make_takeover_for_ils()
+
+        # First tick: above window
+        result1 = takeover.should_initiate_takeover(
+            distance_to_threshold=0.0,
+            altitude_agl=320.0,
+            approach_phase="FINAL",
+            approach_type="ILS",
+            decision_height=DH,
+        )
+        assert result1 is False, "320ft is above window"
+
+        # Second tick: crosses into window (320 → 230, crossing 250)
+        result2 = takeover.should_initiate_takeover(
+            distance_to_threshold=0.0,
+            altitude_agl=230.0,
+            approach_phase="FINAL",
+            approach_type="ILS",
+            decision_height=DH,
+        )
+        assert result2 is True, "Crossing from 320 to 230 should trigger"
+
+    def test_large_step_below_dh_does_not_initiate(self):
+        """FIX-3: 320 → 195: crosses below DH → no takeover, DH guard handles it.
+
+        Crossing detection should NOT trigger when crossing below DH.
+        """
+        takeover = _make_takeover_for_ils()
+
+        # First tick: above window
+        result1 = takeover.should_initiate_takeover(
+            distance_to_threshold=0.0,
+            altitude_agl=320.0,
+            approach_phase="FINAL",
+            approach_type="ILS",
+            decision_height=DH,
+        )
+        assert result1 is False
+
+        # Second tick: below DH entirely (195 < 200)
+        result2 = takeover.should_initiate_takeover(
+            distance_to_threshold=0.0,
+            altitude_agl=195.0,
+            approach_phase="FINAL",
+            approach_type="ILS",
+            decision_height=DH,
+        )
+        assert result2 is False, "Below DH should NOT initiate takeover"
+
+    def test_prev_altitude_resets(self):
+        """FIX-3: reset() clears _prev_altitude_agl."""
+        takeover = _make_takeover_for_ils()
+
+        takeover.should_initiate_takeover(
+            distance_to_threshold=0.0,
+            altitude_agl=300.0,
+            approach_phase="FINAL",
+            approach_type="ILS",
+            decision_height=DH,
+        )
+        assert takeover._prev_altitude_agl == 300.0
+
+        takeover.reset()
+        assert takeover._prev_altitude_agl is None

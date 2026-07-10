@@ -75,6 +75,7 @@ class AutopilotTakeover:
         self.initial_parameters: Dict = {}
         self._commands_sent = False
         self._clock = clock or time.monotonic
+        self._prev_altitude_agl: Optional[float] = None  # WP-4 / FIX-3
 
     # ── public API ────────────────────────────────────────────────
 
@@ -99,13 +100,23 @@ class AutopilotTakeover:
 
             takeover_height = decision_height + 50.0
 
-            if altitude_agl <= takeover_height and altitude_agl > decision_height:
-                if approach_phase in ['FINAL', 'LANDING']:
-                    logger.info("ILS takeover conditions met at DH: "
-                                "altitude=%.0fft, DH=%.0fft, category=%s",
-                                altitude_agl, decision_height,
-                                ils_category or 'CAT_I')
-                    return True
+            # WP-4 / FIX-3: crossing detection
+            prev = self._prev_altitude_agl
+            self._prev_altitude_agl = altitude_agl
+
+            in_window = (altitude_agl <= takeover_height
+                         and altitude_agl > decision_height)
+            crossed = (prev is not None
+                       and prev > takeover_height
+                       and altitude_agl <= takeover_height
+                       and altitude_agl > decision_height)
+
+            if (in_window or crossed) and approach_phase in ['FINAL', 'LANDING']:
+                logger.info("ILS takeover conditions met at DH: "
+                            "altitude=%.0fft, DH=%.0fft, category=%s",
+                            altitude_agl, decision_height,
+                            ils_category or 'CAT_I')
+                return True
             return False
 
         if approach_type and approach_type.upper() not in ['VOR', 'NDB']:
@@ -342,6 +353,7 @@ class AutopilotTakeover:
         self.takeover_start_time = None
         self.initial_parameters = {}
         self._commands_sent = False
+        self._prev_altitude_agl = None
         logger.info("Takeover controller reset")
 
     def get_recommended_takeover_point(self,

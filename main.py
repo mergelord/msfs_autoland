@@ -618,9 +618,13 @@ class AutoLandSystem:
         if self.use_ils and ils.get('nav1_has_localizer'):
             return self.ils_navigation.calculate_ils_approach(data, ils)
         elif (self.approach_config is not None
-              and self.approach_config.station.type == 'LOC'
-              and ils.get('nav1_has_localizer')):
-            return self.ils_navigation.calculate_loc_approach(data, ils)
+              and self.approach_config.station.type == 'LOC'):
+            # LOC: always route through calculate_loc_approach —
+            # it handles signal loss internally (loc_available=False).
+            loc_data = self.ils_navigation.calculate_loc_approach(data, ils)
+            if not loc_data.get('loc_available', False):
+                logger.warning("LOC signal lost — falling back to geometry")
+            return loc_data
         else:
             return self.navigation.calculate_vor_approach(
                 {**position, **attitude},

@@ -666,8 +666,23 @@ class AutoLandSystem:
         Сложность снижена с CC=76 до CC=5
         """
 
+        # FIX-12: Reset per-frame guard verdict BEFORE any early return
+        self._last_guard_decision = None
+        self._last_guard_reason = None
+
         # Fail-closed: signal loss returns None from _calculate_approach_data
         if approach_data is None:
+            # FIX-11: write terminal frame for LOC signal loss / approach_data=None
+            try:
+                self.telemetry_recorder.write_frame(
+                    telemetry=telemetry,
+                    phase=self.phase.value if self.phase else "UNKNOWN",
+                    guard_decision=None,
+                    guard_reason=None,
+                )
+            except Exception:
+                logger.warning("Failed to write terminal frame (approach_data=None)",
+                               exc_info=True)
             return
 
         # Расчёт поправок на ветер
@@ -678,8 +693,6 @@ class AutoLandSystem:
         # Deterministic safety guard — FINAL phase only, BEFORE any actuator commands.
         # Guard wins over StabilizedApproachMonitor (runs earlier, pre-command).
         # Store last guard result for telemetry recorder.
-        self._last_guard_decision = None
-        self._last_guard_reason = None
         if self.phase == ApproachPhase.FINAL and self.safety_guard is not None:
             snapshot = SafetySnapshot.from_telemetry(telemetry, self.approach_config)
             position = telemetry.get('position', {})
@@ -774,6 +787,17 @@ class AutoLandSystem:
                                                          telemetry['position']['altitude_agl'])
                 if radio_height < 3:
                     logger.info("TOUCHDOWN!")
+                    # FIX-11: write terminal touchdown frame before stop_approach
+                    try:
+                        self.telemetry_recorder.write_frame(
+                            telemetry=telemetry,
+                            phase="TOUCHDOWN",
+                            guard_decision=getattr(self, '_last_guard_decision', None),
+                            guard_reason=getattr(self, '_last_guard_reason', None),
+                        )
+                    except Exception:
+                        logger.warning("Failed to write terminal touchdown frame",
+                                       exc_info=True)
                     self.phase = ApproachPhase.COMPLETED
                     self.stop_approach()
                     logger.info("Landing completed!")

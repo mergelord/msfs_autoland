@@ -99,6 +99,7 @@ class AutoLandSystem:
         self.use_custom_autopilot = False  # Флаг использования кастомного автопилота
         self.audio_alerts_enabled = True  # Флаг звуковых предупреждений
         self._last_fms_log_time = 0.0  # Время последнего логирования FMS
+        self._last_guard_snapshot_log_time = 0.0  # Время последнего логирования guard snapshot
 
         self.structured_logger.info(LogCategory.SYSTEM, "AutoLandSystem initialized")
 
@@ -671,6 +672,29 @@ class AutoLandSystem:
                                 guard_result.reason, guard_result.details)
                 self.execute_go_around()
                 return
+
+            # Near-trigger logging: debounce counting but not yet at threshold
+            if guard_result.reason.endswith("_debounce"):
+                logger.warning("SAFETY GUARD near-trigger: %s %s",
+                               guard_result.reason, guard_result.details)
+
+            # Periodic snapshot logging (~5 seconds)
+            current_time = time.time()
+            if current_time - getattr(self, '_last_guard_snapshot_log_time', 0.0) > 5.0:
+                pos = telemetry.get('position', {})
+                spd = telemetry.get('speed', {})
+                logger.info("GUARD SNAPSHOT: vs=%.0f bank=%.1f ias=%.0f vref=%.0f "
+                            "rh=%s alt_agl=%s has_alt=%s has_rh=%s has_ias=%s",
+                            spd.get('vertical_speed', 0),
+                            telemetry.get('attitude', {}).get('bank', 0),
+                            spd.get('airspeed_indicated', 0),
+                            self.approach_config.approach_speed,
+                            pos.get('radio_height'),
+                            pos.get('altitude_agl'),
+                            pos.get('altitude_agl') is not None,
+                            pos.get('radio_height') is not None,
+                            spd.get('airspeed_indicated') is not None)
+                self._last_guard_snapshot_log_time = current_time
 
         # Периодическое логирование FMS данных
         self._log_fms_data()

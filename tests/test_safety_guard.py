@@ -572,6 +572,37 @@ class TestIntegrationLogging:
         assert "SAFETY GUARD: GO_AROUND" in caplog.text
         assert "CRITICAL_SINK_RATE" in caplog.text
 
+    def test_near_trigger_logged(self, caplog):
+        """Near-trigger: CONTINUE + reason ends with _debounce → WARNING log."""
+        from main import AutoLandSystem, ApproachPhase
+
+        system = AutoLandSystem.__new__(AutoLandSystem)
+        system.phase = ApproachPhase.FINAL
+        system.approach_config = _make_config()
+        system.safety_guard = ApproachSafetyGuard(debounce_n=2)  # needs 2 frames
+        system.wind_correction = MagicMock()
+        system.wind_correction.apply_wind_corrections.return_value = {
+            "corrected_heading": 270, "corrected_vs": 700,
+            "headwind": 10, "crosswind": 5, "wind_speed": 12,
+            "wind_direction": 280, "drift_angle": 2.0,
+        }
+        system.fms_reader = None
+        system._last_guard_snapshot_log_time = 0.0
+        system.phase_state = MagicMock()
+        system.phase_state.handle.return_value = None
+        system.execute_go_around = MagicMock()
+        system._update_phase_enum = MagicMock()
+
+        telemetry = make_telemetry(vertical_speed=-2000, altitude_agl=500, airspeed=120)
+        approach_data = {"distance_to_station": 5.0, "required_altitude": 2000,
+                         "on_course": True, "cross_track_error": 0.5}
+
+        with caplog.at_level(logging.WARNING, logger="main"):
+            system._handle_phase(telemetry, approach_data)
+
+        assert "SAFETY GUARD near-trigger" in caplog.text
+        assert "CRITICAL_SINK_RATE_debounce" in caplog.text
+
 
 class TestIntegrationLocSignalLossUntouched:
     """Verify LOC signal-loss path (TASK-005) not affected by guard."""

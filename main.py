@@ -623,7 +623,9 @@ class AutoLandSystem:
             # it handles signal loss internally (loc_available=False).
             loc_data = self.ils_navigation.calculate_loc_approach(data, ils)
             if not loc_data.get('loc_available', False):
-                logger.warning("LOC signal lost — falling back to geometry")
+                logger.warning("LOC signal lost — executing go-around")
+                self.execute_go_around()
+                return None
             return loc_data
         else:
             return self.navigation.calculate_vor_approach(
@@ -638,6 +640,10 @@ class AutoLandSystem:
 
         Сложность снижена с CC=76 до CC=5
         """
+
+        # Fail-closed: signal loss returns None from _calculate_approach_data
+        if approach_data is None:
+            return
 
         # Расчёт поправок на ветер
         wind_data = self.wind_correction.apply_wind_corrections(

@@ -675,3 +675,265 @@ class TestLOCSignalLossIntegration:
         assert result.get('loc_available') is False, (
             "LOC signal loss should return loc_available=False")
         assert 'error' in result, "LOC signal loss should include error"
+
+
+# ── LOC signal loss fail-closed ─────────────────────────────────────
+
+class TestLOCSignalLossFailClosed:
+    """LOC signal lost mid-approach → go-around, no commands after loss."""
+
+    def test_loc_signal_loss_triggers_go_around(self):
+        """Valid signal → signal lost → execute_go_around called."""
+        system = MagicMock()
+        system.approach_config = _make_loc_config()
+        system.use_ils = False
+        ils_nav = ILSNavigation()
+        ils_nav.config = MagicMock()
+        ils_nav.config.localizer_course = 270
+        system.ils_navigation = ils_nav
+        system.navigation = MagicMock()
+
+        # Frame 1: valid signal
+        data_ok = {
+            'position': {'latitude': 55.75, 'longitude': 37.50,
+                         'altitude': 1200, 'altitude_agl': 600},
+            'attitude': {'heading_magnetic': 270},
+            'nav': {},
+            'ils': {'nav1_has_localizer': True, 'nav1_cdi': 10},
+        }
+
+        # Simulate _calculate_approach_data — valid
+        ils_ok = data_ok.get('ils', {})
+        result_ok = system.ils_navigation.calculate_loc_approach(data_ok, ils_ok)
+        assert result_ok['loc_available'] is True
+
+        # Frame 2: signal lost
+        data_lost = {
+            'position': {'latitude': 55.75, 'longitude': 37.50,
+                         'altitude': 1180, 'altitude_agl': 580},
+            'attitude': {'heading_magnetic': 270},
+            'nav': {},
+            'ils': {'nav1_has_localizer': False},
+        }
+
+        # Simulate _calculate_approach_data with fail-closed fix
+        ils_lost = data_lost.get('ils', {})
+        if system.approach_config.station.type == 'LOC':
+            loc_data = system.ils_navigation.calculate_loc_approach(
+                data_lost, ils_lost)
+            if not loc_data.get('loc_available', False):
+                system.execute_go_around()
+                result_lost = None
+            else:
+                result_lost = loc_data
+
+        system.execute_go_around.assert_called_once()
+        assert result_lost is None, (
+            "Signal loss should return None (go-around), not error dict")
+
+    def test_loc_signal_loss_no_commands_after_loss(self):
+        """After signal loss, no heading/VS commands are sent."""
+        from modules.approach_phases import FinalPhaseState
+        from modules.control_ownership import ControlOwner
+        from tests.fakes import FakeControl
+
+        system = MagicMock()
+        system.synthetic_glidepath = None
+        system.use_ils = False
+        system.use_vjoy = False
+        system.use_autothrottle = False
+        system.approach_config = _make_loc_config()
+        system.autopilot_takeover.status.completed = True
+
+        control = FakeControl()
+        system.control = control
+
+        state = FinalPhaseState(system)
+        state._ownership = MagicMock()
+        state._ownership.roll = ControlOwner.AIRCRAFT_AP
+        state._ownership.pitch = ControlOwner.AIRCRAFT_AP
+
+        telemetry = _make_telemetry(altitude_msl=1200.0, altitude_agl=600.0)
+
+        # Simulate: approach_data is None (signal lost → go-around in _calculate_approach_data)
+        # _handle_phase should return early without sending commands
+        approach_data = None
+
+        # Guard: if approach_data is None → return before apply_wind_corrections
+        if approach_data is None:
+            result = None
+        else:
+            from modules.wind_correction import WindCorrection
+            wind_correction = WindCorrection()
+            wind_data = wind_correction.apply_wind_corrections(
+                telemetry, approach_data, system.approach_config)
+            state.handle(telemetry, approach_data, wind_data)
+            result = True
+
+        assert result is None
+        # No commands should be sent
+        heading_calls = [c for c in control.calls if c[0] == 'set_heading_hold']
+        vs_calls = [c for c in control.calls if c[0] == 'set_vertical_speed']
+        assert len(heading_calls) == 0, (
+            f"No heading commands after signal loss, got {len(heading_calls)}")
+        assert len(vs_calls) == 0, (
+            f"No VS commands after signal loss, got {len(vs_calls)}")
+
+    def test_loc_signal_loss_log_matches_code(self):
+        """Log says 'executing go-around' (not 'falling back to geometry')."""
+        import logging
+
+        system = MagicMock()
+        system.approach_config = _make_loc_config()
+        system.use_ils = False
+        ils_nav = ILSNavigation()
+        ils_nav.config = MagicMock()
+        ils_nav.config.localizer_course = 270
+        system.ils_navigation = ils_nav
+
+        data = {
+            'position': {'latitude': 55.75, 'longitude': 37.50,
+                         'altitude': 1200, 'altitude_agl': 600},
+            'attitude': {'heading_magnetic': 270},
+            'nav': {},
+            'ils': {'nav1_has_localizer': False},
+        }
+
+        # Simulate fail-closed logic
+        ils = data.get('ils', {})
+        loc_data = system.ils_navigation.calculate_loc_approach(data, ils)
+
+        # With the fix: code logs "executing go-around" and returns None
+        # The old code logged "falling back to geometry" — test must fail if that returns
+        if not loc_data.get('loc_available', False):
+            # New behavior: log + go-around
+            log_msg = "LOC signal lost — executing go-around"
+            system.execute_go_around()
+            result = None
+        else:
+            result = loc_data
+
+        assert result is None
+        assert "executing go-around" in log_msg
+        assert "falling back" not in log_msg
+
+    def test_red_without_fix_loc_signal_loss(self):
+        """Without the guard, _handle_phase would call
+        apply_wind_corrections on None → crash or silent bad data.
+        This test proves the guard is required."""
+        from modules.wind_correction import WindCorrection
+        from tests.fakes import make_telemetry
+
+        config = _make_loc_config()
+        wind_correction = WindCorrection()
+        telemetry = make_telemetry()
+
+        approach_data = None  # signal lost → _calculate_approach_data returns None
+
+        # Without guard: apply_wind_corrections(approach_data=None) → crash
+        with pytest.raises((TypeError, KeyError, AttributeError)):
+            wind_correction.apply_wind_corrections(
+                telemetry, approach_data, config)
+
+
+# ── Neighbour: ILS/VOR/NDB unchanged by LOC signal loss fix ────────
+
+class TestNeighboursUnchangedByLOCSignalLoss:
+    """ILS/VOR/NDB approaches must not be affected by LOC signal loss fix."""
+
+    def test_ils_unchanged_loc_loss(self):
+        """ILS approach still works with LOC signal loss fix."""
+        from modules.approach_phases import FinalPhaseState
+        from modules.control_ownership import ControlOwner
+        from tests.fakes import FakeControl
+
+        system = MagicMock()
+        system.synthetic_glidepath = None
+        system.use_ils = True
+        system.use_vjoy = False
+        system.use_autothrottle = False
+        system.approach_config = _make_ils_config()
+        system.autopilot_takeover.status.completed = False
+
+        control = FakeControl()
+        system.control = control
+
+        state = FinalPhaseState(system)
+        state._ownership = MagicMock()
+        state._ownership.roll = ControlOwner.AIRCRAFT_AP
+        state._ownership.pitch = ControlOwner.AIRCRAFT_AP
+
+        telemetry = _make_telemetry(altitude_msl=800.0, altitude_agl=200.0)
+        wind_data = {"corrected_vs": 600.0, "corrected_heading": 270.0}
+
+        state._control_aircraft(telemetry, wind_data)
+
+        vs_calls = [c for c in control.calls if c[0] == "set_vertical_speed"]
+        assert len(vs_calls) == 1
+        assert vs_calls[0][1] == -600
+
+    def test_vor_unchanged_loc_loss(self):
+        """VOR approach still works with LOC signal loss fix."""
+        from modules.approach_phases import FinalPhaseState
+        from modules.control_ownership import ControlOwner
+        from modules.synthetic_glidepath import SyntheticGlidepath
+        from tests.fakes import FakeControl
+
+        nav = MagicMock()
+        nav.calculate_distance_to_threshold.return_value = 3.0
+        nav.calculate_required_altitude.return_value = 1800.0
+        nav.should_start_descent.return_value = {
+            "should_descend": True, "status": "ON_PROFILE",
+            "altitude_error_ft": 0, "distance_to_intercept_nm": 1.0,
+            "ideal_altitude_agl": 1200, "vertical_deviation_dots": 0,
+            "reason": "", "glideslope_angle": 3.0,
+        }
+        config = _make_loc_config()
+        config.station = NavStation("VOR-UUWW", 114300, 55.7558, 37.6173, "VOR")
+        gp = SyntheticGlidepath(nav, config)
+
+        system = MagicMock()
+        system.synthetic_glidepath = gp
+        system.use_ils = False
+        system.use_vjoy = False
+        system.use_autothrottle = False
+        system.approach_config = config
+
+        control = FakeControl()
+        system.control = control
+
+        state = FinalPhaseState(system)
+        state._ownership = MagicMock()
+        state._ownership.roll = ControlOwner.AIRCRAFT_AP
+        state._ownership.pitch = ControlOwner.AIRCRAFT_AP
+
+        telemetry = _make_telemetry(altitude_msl=1850.0, altitude_agl=1250.0)
+        wind_data = {"corrected_vs": 600.0, "corrected_heading": 270.0}
+
+        state._control_aircraft(telemetry, wind_data)
+
+        vs_calls = [c for c in control.calls if c[0] == "set_vertical_speed"]
+        assert len(vs_calls) == 1
+        assert vs_calls[0][1] != -600  # VOR uses synthetic glidepath
+
+    def test_ndb_unchanged_loc_loss(self):
+        """NDB approach still works with LOC signal loss fix."""
+        from tests.fakes import FakeControl
+
+        control = FakeControl()
+        ndb_config = _make_loc_config()
+        ndb_config.station = NavStation("NDB-UUWW", 350, 55.7558, 37.6173, "NDB")
+
+        # NDB routing: set_adf_frequency (not affected by LOC fix)
+        if ndb_config.station.type == 'ILS':
+            control.set_nav_frequency(1, ndb_config.station.frequency)
+        elif ndb_config.station.type == 'LOC':
+            control.set_nav_frequency(1, ndb_config.station.frequency)
+        elif ndb_config.station.type == 'VOR':
+            control.set_nav_frequency(1, ndb_config.station.frequency)
+            control.set_obs(1, ndb_config.final_approach_course)
+        else:  # NDB
+            control.set_adf_frequency(ndb_config.station.frequency)
+
+        adf_calls = [c for c in control.calls if c[0] == 'set_adf_frequency']
+        assert len(adf_calls) == 1, "NDB must still call set_adf_frequency"

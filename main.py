@@ -648,8 +648,10 @@ class AutoLandSystem:
             # it handles signal loss internally (loc_available=False).
             loc_data = self.ils_navigation.calculate_loc_approach(data, ils)
             if not loc_data.get('loc_available', False):
-                logger.warning("LOC signal lost — executing go-around")
-                self.execute_go_around()
+                logger.warning("LOC signal lost — returning None for _handle_phase")
+                # FIX-13: Don't call execute_go_around here.
+                # Return None and let _handle_phase handle the terminal frame
+                # and go-around AFTER actuator commands.
                 return None
             return loc_data
         else:
@@ -672,17 +674,16 @@ class AutoLandSystem:
 
         # Fail-closed: signal loss returns None from _calculate_approach_data
         if approach_data is None:
-            # FIX-11: write terminal frame for LOC signal loss / approach_data=None
-            try:
-                self.telemetry_recorder.write_frame(
-                    telemetry=telemetry,
-                    phase=self.phase.value if self.phase else "UNKNOWN",
-                    guard_decision=None,
-                    guard_reason=None,
-                )
-            except Exception:
-                logger.warning("Failed to write terminal frame (approach_data=None)",
-                               exc_info=True)
+            # FIX-13/FIX-14: LOC-loss terminal frame as pending,
+            # then go-around actuator commands, then flush pending to disk.
+            self.telemetry_recorder.set_pending_frame(
+                telemetry=telemetry,
+                phase=self.phase.value if self.phase else "UNKNOWN",
+                guard_decision=None,
+                guard_reason=None,
+            )
+            self.execute_go_around()
+            self.telemetry_recorder.flush_pending_frame()
             return
 
         # Расчёт поправок на ветер
@@ -708,19 +709,16 @@ class AutoLandSystem:
                 self._last_guard_reason = guard_result.reason
                 logger.critical("SAFETY GUARD: GO_AROUND — %s %s",
                                 guard_result.reason, guard_result.details)
-                # Write terminal guard frame BEFORE execute_go_around
-                # (execute_go_around → stop_approach → stop_recording)
-                try:
-                    self.telemetry_recorder.write_frame(
-                        telemetry=telemetry,
-                        phase=self.phase.value if self.phase else "UNKNOWN",
-                        guard_decision="GO_AROUND",
-                        guard_reason=guard_result.reason,
-                    )
-                except Exception:
-                    logger.warning("Failed to write terminal guard frame",
-                                   exc_info=True)
+                # FIX-14: Set pending frame, execute actuator commands, then flush.
+                # Disk I/O must NOT delay GO_AROUND actuator commands.
+                self.telemetry_recorder.set_pending_frame(
+                    telemetry=telemetry,
+                    phase=self.phase.value if self.phase else "UNKNOWN",
+                    guard_decision="GO_AROUND",
+                    guard_reason=guard_result.reason,
+                )
                 self.execute_go_around()
+                self.telemetry_recorder.flush_pending_frame()
                 return
 
             # Near-trigger logging: debounce counting but not yet at threshold
@@ -787,19 +785,16 @@ class AutoLandSystem:
                                                          telemetry['position']['altitude_agl'])
                 if radio_height < 3:
                     logger.info("TOUCHDOWN!")
-                    # FIX-11: write terminal touchdown frame before stop_approach
-                    try:
-                        self.telemetry_recorder.write_frame(
-                            telemetry=telemetry,
-                            phase="TOUCHDOWN",
-                            guard_decision=getattr(self, '_last_guard_decision', None),
-                            guard_reason=getattr(self, '_last_guard_reason', None),
-                        )
-                    except Exception:
-                        logger.warning("Failed to write terminal touchdown frame",
-                                       exc_info=True)
+                    # FIX-14: Set pending frame, stop approach, flush pending.
+                    self.telemetry_recorder.set_pending_frame(
+                        telemetry=telemetry,
+                        phase="TOUCHDOWN",
+                        guard_decision=getattr(self, '_last_guard_decision', None),
+                        guard_reason=getattr(self, '_last_guard_reason', None),
+                    )
                     self.phase = ApproachPhase.COMPLETED
                     self.stop_approach()
+                    self.telemetry_recorder.flush_pending_frame()
                     logger.info("Landing completed!")
 
     def _log_fms_data(self):

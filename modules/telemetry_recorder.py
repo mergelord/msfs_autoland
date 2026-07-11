@@ -7,6 +7,10 @@ swallowed with a warning; the flight continues.
 Schema: pre-defined from known get_all_data() structure. Each frame is written
 immediately to disk — no RAM buffering. Process crash before stop does not
 destroy recorded data.
+
+Terminal frames (GO_AROUND, touchdown, LOC-loss) are written as pending data
+in memory, then flushed to disk AFTER actuator commands complete. This
+guarantees GO_AROUND actuator commands are never delayed by disk I/O.
 """
 
 import csv
@@ -23,6 +27,7 @@ _KNOWN_SECTIONS = {
     'position': ['altitude', 'altitude_agl', 'latitude', 'longitude',
                  'on_ground', 'radio_height'],
     'attitude': ['bank', 'heading_magnetic', 'heading_true', 'pitch'],
+    'orientation': ['bank', 'heading_magnetic', 'heading_true', 'pitch'],
     'speed': ['airspeed_indicated', 'airspeed_true', 'ground_speed',
               'vertical_speed'],
     'nav': ['adf_frequency', 'adf_radial', 'adf_signal',
@@ -39,7 +44,7 @@ _KNOWN_SECTIONS = {
                   'heading_hold', 'master', 'nav_hold'],
     'weather': ['ambient_temperature', 'ambient_wind_direction',
                 'ambient_wind_velocity', 'barometer_pressure',
-                'kohlsman_setting_mb', 'sea_level_pressure'],
+                'kohlsman_setting', 'sea_level_pressure'],
     'weight': ['empty_weight', 'fuel_weight', 'payload_weight',
                'total_weight'],
     'aircraft': ['aircraft_manufacturer', 'autopilot_max_bank',
@@ -102,6 +107,9 @@ class TelemetryRecorder:
 
     Each frame is written immediately to disk via csv.DictWriter.
     Schema is pre-defined (FIELDNAMES) — no dynamic drift.
+
+    Terminal frames (GO_AROUND, touchdown, LOC-loss) are buffered as pending
+    and flushed AFTER actuator commands complete, via flush_pending_frame().
     """
 
     _session_counter: int = 0  # monotonic per-process counter for unique filenames
@@ -112,6 +120,7 @@ class TelemetryRecorder:
         self._writer: Optional[csv.DictWriter] = None
         self._frame_count: int = 0
         self._filepath: Optional[Path] = None
+        self._pending_frame: Optional[Dict[str, Any]] = None
 
     @property
     def is_recording(self) -> bool:
@@ -131,15 +140,25 @@ class TelemetryRecorder:
             self._file.flush()
             self._frame_count = 0
             self._filepath = filepath
+            self._pending_frame = None
             logger.info("Telemetry recorder started: %s", filepath)
         except Exception as e:
             logger.warning("Telemetry recorder failed to start: %s", e)
+            # Cleanup: close file if it was opened
+            try:
+                if self._file and not self._file.closed:
+                    self._file.close()
+            except Exception:
+                pass
             self._file = None
             self._writer = None
 
     def stop_recording(self) -> None:
-        """Close the file. Rows are already on disk — this just releases the handle."""
+        """Flush pending frame, then close the file."""
         try:
+            # Flush any pending terminal frame before closing
+            self.flush_pending_frame()
+
             if self._file and not self._file.closed:
                 self._file.flush()
                 self._file.close()
@@ -155,6 +174,7 @@ class TelemetryRecorder:
                 pass
             self._file = None
             self._writer = None
+            self._pending_frame = None
 
     def write_frame(
         self,
@@ -175,26 +195,69 @@ class TelemetryRecorder:
             return
 
         try:
-            row: Dict[str, Any] = {}
-            row['timestamp'] = time.time()
-            row['phase'] = phase
-
-            # Flatten all nested telemetry sections deterministically
-            for section_name in sorted(telemetry.keys()):
-                section = telemetry[section_name]
-                if isinstance(section, dict):
-                    flat = _flatten_dict(section, parent_key=section_name)
-                    row.update(flat)
-                else:
-                    row[section_name] = section
-
-            # Guard verdict columns
-            row['guard_decision'] = guard_decision if guard_decision is not None else ''
-            row['guard_reason'] = guard_reason if guard_reason is not None else ''
-
+            row = self._build_row(telemetry, phase, guard_decision, guard_reason)
             self._writer.writerow(row)
             self._file.flush()
             self._frame_count += 1
         except Exception as e:
-            # Swallow ALL errors — recorder must never break the control loop
             logger.warning("Telemetry recorder write error: %s", e)
+
+    def set_pending_frame(
+        self,
+        telemetry: dict,
+        phase: str,
+        guard_decision: Optional[str] = None,
+        guard_reason: Optional[str] = None,
+    ) -> None:
+        """Buffer a terminal frame in memory. Written to disk on next flush_pending_frame()
+        or stop_recording(). Used for GO_AROUND/touchdown/LOC-loss frames that must
+        NOT delay actuator commands with disk I/O."""
+        try:
+            self._pending_frame = self._build_row(telemetry, phase,
+                                                  guard_decision, guard_reason)
+        except Exception as e:
+            logger.warning("Telemetry recorder pending frame error: %s", e)
+            self._pending_frame = None
+
+    def flush_pending_frame(self) -> None:
+        """Write the pending terminal frame to disk if present. Never raises."""
+        if self._pending_frame is None:
+            return
+        if not self.is_recording:
+            self._pending_frame = None
+            return
+        try:
+            self._writer.writerow(self._pending_frame)
+            self._file.flush()
+            self._frame_count += 1
+            self._pending_frame = None
+        except Exception as e:
+            logger.warning("Telemetry recorder pending flush error: %s", e)
+            self._pending_frame = None
+
+    def _build_row(
+        self,
+        telemetry: dict,
+        phase: str,
+        guard_decision: Optional[str] = None,
+        guard_reason: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Build a flat row dict from telemetry. Never raises."""
+        row: Dict[str, Any] = {}
+        row['timestamp'] = time.time()
+        row['phase'] = phase
+
+        # Flatten all nested telemetry sections deterministically
+        for section_name in sorted(telemetry.keys()):
+            section = telemetry[section_name]
+            if isinstance(section, dict):
+                flat = _flatten_dict(section, parent_key=section_name)
+                row.update(flat)
+            else:
+                row[section_name] = section
+
+        # Guard verdict columns
+        row['guard_decision'] = guard_decision if guard_decision is not None else ''
+        row['guard_reason'] = guard_reason if guard_reason is not None else ''
+
+        return row

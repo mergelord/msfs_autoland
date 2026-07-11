@@ -319,6 +319,7 @@ class TestIntegrationFinalCriticalViolation:
             "wind_direction": 280, "drift_angle": 2.0,
         }
         system.fms_reader = None
+        system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
         system.execute_go_around = MagicMock()
 
@@ -349,6 +350,7 @@ class TestIntegrationFinalNormal:
             "wind_direction": 280, "drift_angle": 2.0,
         }
         system.fms_reader = None
+        system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
         system.phase_state.handle.return_value = None
         system._update_phase_enum = MagicMock()
@@ -379,6 +381,7 @@ class TestIntegrationNonFinalPhase:
             "wind_direction": 280, "drift_angle": 2.0,
         }
         system.fms_reader = None
+        system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
         system.phase_state.handle.return_value = None
         system.execute_go_around = MagicMock()
@@ -427,6 +430,7 @@ class TestIntegrationApproachTypes:
             "wind_direction": 280, "drift_angle": 2.0,
         }
         system.fms_reader = None
+        system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
         system.phase_state.handle.return_value = None
         system.execute_go_around = MagicMock()
@@ -471,6 +475,7 @@ class TestIntegrationIdempotence:
             "wind_direction": 280, "drift_angle": 2.0,
         }
         system.fms_reader = None
+        system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
         call_count = 0
         def fake_go_around():
@@ -505,6 +510,7 @@ class TestIntegrationGuardAndExistingMonitorCoexist:
             "wind_direction": 280, "drift_angle": 2.0,
         }
         system.fms_reader = None
+        system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
         call_count = 0
         def fake_go_around():
@@ -559,6 +565,7 @@ class TestIntegrationLogging:
             "wind_direction": 280, "drift_angle": 2.0,
         }
         system.fms_reader = None
+        system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
         system.execute_go_around = MagicMock()
 
@@ -619,10 +626,14 @@ class TestIntegrationLocSignalLossUntouched:
         system.wind_correction = MagicMock()
         system.execute_go_around = MagicMock()
         system.phase_state = MagicMock()
+        system.telemetry_recorder = MagicMock()
 
         # _calculate_approach_data returns None for LOC signal loss
-        system._handle_phase(None, None)  # approach_data=None → early return
-        system.execute_go_around.assert_not_called()
+        # _handle_phase calls execute_go_around (FIX-13), but guard is NOT involved
+        system._handle_phase(None, None)  # approach_data=None → go-around via _handle_phase
+        system.execute_go_around.assert_called_once()
+        # Guard did NOT run (approach_data=None returns before guard check)
+        system.wind_correction.apply_wind_corrections.assert_not_called()
         system.phase_state.handle.assert_not_called()
 
 
@@ -654,6 +665,7 @@ class TestRedWithoutFix:
             "wind_direction": 280, "drift_angle": 2.0,
         }
         system.fms_reader = None
+        system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
         system.phase_state.handle.return_value = None
         system.execute_go_around = MagicMock()
@@ -689,6 +701,7 @@ class TestRedWithoutFix:
             "wind_direction": 280, "drift_angle": 2.0,
         }
         system.fms_reader = None
+        system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
         system.phase_state.handle.return_value = None
         system.execute_go_around = MagicMock()

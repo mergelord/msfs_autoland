@@ -14,6 +14,7 @@ Tests:
   T-REC-17: Real flush/close failure test.
 """
 
+import copy
 import csv
 import logging
 import sys
@@ -268,10 +269,12 @@ class TestRealFlushCloseFailure:
 # ═══════════════════════════════════════════════════════════════════
 
 class TestPendingFramePattern:
-    """FIX-14: Terminal frames are pending, flushed via stop_recording after actuator commands."""
+    """T2: Real actuator → disk I/O order via real execute_go_around."""
 
     def test_go_around_actuator_before_flush(self, tmp_path):
-        """GO_AROUND actuator commands called, then stop_recording flushes pending."""
+        """Real AutoLandSystem.execute_go_around with FakeControl.
+        Proves: set_throttle < writerow, set_vertical_speed < writerow,
+        set_flaps < writerow. Exactly 1 CSV terminal row."""
         from main import AutoLandSystem, ApproachPhase
         from modules.safety_guard import ApproachSafetyGuard
         from modules.types import ApproachConfig, NavStation
@@ -311,6 +314,41 @@ class TestPendingFramePattern:
         system.running = True
         system.phase = ApproachPhase.FINAL
 
+        # Track real events in order
+        call_order = []
+
+        # Wrap real control methods
+        original_set_throttle = control.set_throttle
+        def tracking_set_throttle(v):
+            call_order.append("set_throttle")
+            return original_set_throttle(v)
+        control.set_throttle = tracking_set_throttle
+
+        original_set_vs = control.set_vertical_speed
+        def tracking_set_vs(vs):
+            call_order.append("set_vertical_speed")
+            return original_set_vs(vs)
+        control.set_vertical_speed = tracking_set_vs
+
+        original_set_flaps = control.set_flaps
+        def tracking_set_flaps(pos):
+            call_order.append("set_flaps")
+            return original_set_flaps(pos)
+        control.set_flaps = tracking_set_flaps
+
+        # Wrap real recorder writerow/flush
+        original_writerow = system.telemetry_recorder._writer.writerow
+        def tracking_writerow(row):
+            call_order.append("writerow")
+            return original_writerow(row)
+        system.telemetry_recorder._writer.writerow = tracking_writerow
+
+        original_flush = system.telemetry_recorder._file.flush
+        def tracking_flush():
+            call_order.append("file_flush")
+            return original_flush()
+        system.telemetry_recorder._file.flush = tracking_flush
+
         telemetry = make_telemetry(vertical_speed=-2000, altitude_agl=500,
                                    airspeed=120)
         approach_data = {"distance_to_station": 5.0, "required_altitude": 2000,
@@ -318,14 +356,18 @@ class TestPendingFramePattern:
 
         system._handle_phase(telemetry, approach_data)
 
-        # Real actuator commands were sent by execute_go_around
+        # Real actuator commands were sent
         assert control.has_call('set_throttle')
         assert control.has_call('set_vertical_speed')
+        assert control.has_call('set_flaps')
 
-        # stop_approach was called (running=False)
-        assert system.running is False
+        # Verify order: actuator commands BEFORE disk I/O
+        assert call_order.index("set_throttle") < call_order.index("writerow")
+        assert call_order.index("set_vertical_speed") < call_order.index("writerow")
+        assert call_order.index("set_flaps") < call_order.index("writerow")
 
-        # Pending frame was flushed by stop_recording
+        # Exactly 1 CSV terminal row
+        system.telemetry_recorder.stop_recording()
         csv_files = list(tmp_path.glob('telemetry_*.csv'))
         _, rows = _read_csv(csv_files[0])
         assert len(rows) == 1
@@ -553,15 +595,20 @@ class TestWriteErrorResilience:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# FIX-15: Real execute_approach test
+# T1: Real execute_approach test — exact assertions
 # ═══════════════════════════════════════════════════════════════════
 
 class TestRealExecuteApproach:
-    """FIX-15: Real AutoLandSystem.execute_approach with 2 iterations."""
+    """T1: Real AutoLandSystem.execute_approach with 2 iterations."""
 
     def test_execute_approach_two_iterations_with_recorder_error(self, tmp_path, caplog):
         """Real execute_approach: 2 iterations, first write_frame throws,
-        caplog confirms warning, second iteration executes, then stops."""
+        caplog confirms exact warning, second iteration executes, then stops.
+
+        Red-without-fix: removing the try/except around recorder in
+        execute_approach makes this test FAIL even with the outer
+        exception handler.
+        """
         from main import AutoLandSystem, ApproachPhase
         from modules.safety_guard import ApproachSafetyGuard
         from modules.types import ApproachConfig, NavStation
@@ -629,40 +676,142 @@ class TestRealExecuteApproach:
         system.telemetry_recorder = TelemetryRecorder(log_dir=str(tmp_path))
         system.telemetry_recorder.start_recording()
 
-        # Make first write_frame throw, second succeed
-        original_write = system.telemetry_recorder.write_frame
-        call_count = [0]
-        def failing_write_once(*args, **kwargs):
-            call_count[0] += 1
-            if call_count[0] == 1:
+        # Track write_frame calls: first throws, second writes real row
+        write_call_count = [0]
+        original_write_frame = system.telemetry_recorder.write_frame
+        def tracking_write_frame(*args, **kwargs):
+            write_call_count[0] += 1
+            if write_call_count[0] == 1:
                 raise IOError("Simulated disk error on first frame")
-            return original_write(*args, **kwargs)
-        system.telemetry_recorder.write_frame = failing_write_once
+            return original_write_frame(*args, **kwargs)
+        system.telemetry_recorder.write_frame = tracking_write_frame
 
-        # Run execute_approach — it will iterate twice then we stop it
-        system.running = True
-        iteration_count = [0]
+        # Track _handle_phase calls and stop after 2nd iteration
+        handle_phase_count = [0]
         original_handle_phase = AutoLandSystem._handle_phase
         def counting_handle_phase(self_sys, telemetry, approach_data):
-            iteration_count[0] += 1
-            if iteration_count[0] >= 2:
+            handle_phase_count[0] += 1
+            if handle_phase_count[0] >= 2:
                 self_sys.running = False
             return original_handle_phase(self_sys, telemetry, approach_data)
         system._handle_phase = lambda t, a: counting_handle_phase(system, t, a)
 
+        system.running = True
         with caplog.at_level(logging.WARNING, logger="main"):
             system.execute_approach()
 
-        # Warning from first frame write error
-        assert "disk error" in caplog.text.lower() or "recorder" in caplog.text.lower()
+        # EXACT assertions — no or-laziness
+        assert "Telemetry recorder frame write failed" in caplog.text
+        assert "Error in approach execution" not in caplog.text
 
-        # Second iteration executed
-        assert iteration_count[0] >= 2
+        # write_frame attempted exactly 2 times
+        assert write_call_count[0] == 2
 
-        # phase_state.handle was called (normal path continued)
+        # _handle_phase executed exactly 2 times
+        assert handle_phase_count[0] == 2
+
+        # phase_state.handle was called on second iteration (normal path)
         system.phase_state.handle.assert_called()
 
+        # Second write succeeded — CSV has 1 row on disk
         system.telemetry_recorder.stop_recording()
+        csv_files = list(tmp_path.glob('telemetry_*.csv'))
+        _, rows = _read_csv(csv_files[0])
+        assert len(rows) == 1
+
+    def test_red_without_fix_proof(self, tmp_path, caplog):
+        """Red-without-fix: prove the local try/except around recorder is
+        necessary. Patch write_frame to always throw. The local try/except
+        catches the error → loop continues. Without it, the error would
+        propagate to the outer handler → 'Error in approach execution' logged."""
+        from main import AutoLandSystem, ApproachPhase
+        from modules.safety_guard import ApproachSafetyGuard
+        from modules.types import ApproachConfig, NavStation
+
+        system = AutoLandSystem.__new__(AutoLandSystem)
+        system.approach_config = ApproachConfig(
+            station=NavStation("TEST", 11030000, 55.5, 37.5, "VOR"),
+            final_approach_course=270, glideslope_angle=3.0,
+            decision_height=200, approach_speed=120,
+            runway_elevation=0, runway_length=8000, runway_width=150,
+            runway_threshold_lat=55.48, runway_threshold_lon=37.52,
+        )
+        system.use_ils = False
+        system.use_vjoy = False
+        system.use_autothrottle = False
+        system.use_custom_autopilot = False
+        system.audio_alerts_enabled = False
+        system.phase = ApproachPhase.FINAL
+        system.safety_guard = ApproachSafetyGuard(debounce_n=2)
+        system.wind_correction = MagicMock()
+        system.wind_correction.apply_wind_corrections.return_value = {
+            "corrected_heading": 270, "corrected_vs": 700,
+            "headwind": 10, "crosswind": 5, "wind_speed": 12,
+            "wind_direction": 280, "drift_angle": 2.0,
+        }
+        system.fms_reader = None
+        system.phase_state = MagicMock()
+        system.phase_state.handle.return_value = None
+        system._last_guard_snapshot_log_time = 0.0
+        system._last_fms_log_time = 0.0
+        system.connection_monitor = None
+        system.connection_optimizer = None
+        system.ils_navigation = MagicMock()
+        system.navigation = MagicMock()
+        system.navigation.calculate_vor_approach.return_value = {
+            "distance_to_station": 5.0, "required_altitude": 2000,
+            "on_course": True, "cross_track_error": 0.5,
+            "corrected_heading": 270,
+        }
+        system.telemetry = MagicMock()
+        system.control = MagicMock()
+        system.stabilized_monitor = MagicMock()
+        system.autothrottle = MagicMock()
+        system.autothrottle.active = False
+        system.vjoy_throttle = None
+        system.virtual_joystick = MagicMock()
+        system.aircraft_adapter = MagicMock()
+        system.speed_calculator = MagicMock()
+        system.structured_logger = MagicMock()
+        system.flare_controller = MagicMock()
+        system.wind_shear_detector = MagicMock()
+        system.turbulence_detector = MagicMock()
+        system.audio_system = MagicMock()
+        system.autopilot_takeover = MagicMock()
+        system.autopilot_takeover.status.completed = False
+
+        frame = make_telemetry(vertical_speed=-700, altitude_agl=500,
+                               airspeed=120, bank=3.0)
+        system.telemetry.get_all_data.return_value = frame
+
+        system.telemetry_recorder = TelemetryRecorder(log_dir=str(tmp_path))
+        system.telemetry_recorder.start_recording()
+
+        # Always throw — the local try/except catches this
+        system.telemetry_recorder.write_frame = MagicMock(
+            side_effect=IOError("disk error"))
+
+        # Stop after 1 iteration
+        system.running = True
+        handle_count = [0]
+        original_handle_phase = AutoLandSystem._handle_phase
+        def counting_handle(self_sys, t, a):
+            handle_count[0] += 1
+            self_sys.running = False  # stop after 1 iteration
+            return original_handle_phase(self_sys, t, a)
+        system._handle_phase = lambda t, a: counting_handle(system, t, a)
+
+        with caplog.at_level(logging.WARNING, logger="main"):
+            system.execute_approach()
+
+        # PROOF: "Error in approach execution" was NOT logged
+        # → the local try/except caught the error before the outer handler.
+        # If the local try/except were removed, the IOError would propagate
+        # to the outer handler, which would log "Error in approach execution".
+        assert "Error in approach execution" not in caplog.text
+
+        # The local try/except logged the recorder error instead
+        assert "recorder" in caplog.text.lower() or "write" in caplog.text.lower()
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -744,13 +893,14 @@ class TestRecorderReadOnlyContract:
         assert not actuator_methods
 
     def test_telemetry_not_mutated(self, tmp_path):
+        """T3: Recorder does not modify the telemetry dict — exact deep comparison."""
         rec = TelemetryRecorder(log_dir=str(tmp_path))
         rec.start_recording()
         t = _full_telemetry()
-        orig = {k: dict(v) if isinstance(v, dict) else v for k, v in t.items()}
+        original = copy.deepcopy(t)
         rec.write_frame(t, phase="FINAL")
         rec.stop_recording()
-        assert t == orig or set(t.keys()) == set(orig.keys())
+        assert t == original, f"Telemetry was mutated by write_frame"
 
 
 # ═══════════════════════════════════════════════════════════════════

@@ -33,6 +33,7 @@ from modules.virtual_joystick import VirtualJoystick
 from modules.synthetic_glidepath import SyntheticGlidepath
 from modules.wind_correction import WindCorrection
 from modules.wind_shear_detector import WindShearDetector
+from modules.safety_guard import ApproachSafetyGuard, SafetySnapshot, GuardDecision
 
 # Настройка логирования
 logging.basicConfig(
@@ -84,6 +85,7 @@ class AutoLandSystem:
         self.connection_monitor: Optional[ConnectionMonitor] = None
         self.speed_calculator = ApproachSpeedCalculator()
         self.autopilot_takeover = AutopilotTakeover()
+        self.safety_guard = ApproachSafetyGuard()
         self.synthetic_glidepath: Optional[SyntheticGlidepath] = None
         self.approach_config: Optional[ApproachConfig] = None
         self.approach_params: Optional[dict] = None
@@ -298,6 +300,8 @@ class AutoLandSystem:
             self.flare_controller.reset()
         if hasattr(self, 'stabilized_monitor') and hasattr(self.stabilized_monitor, 'reset'):
             self.stabilized_monitor.reset()
+        if hasattr(self, 'safety_guard') and hasattr(self.safety_guard, 'reset'):
+            self.safety_guard.reset()
         logger.info("Approach session state reset")
 
     def start_approach(self):
@@ -649,6 +653,24 @@ class AutoLandSystem:
         wind_data = self.wind_correction.apply_wind_corrections(
             telemetry, approach_data, self.approach_config
         )
+
+        # Deterministic safety guard — FINAL phase only, BEFORE any actuator commands.
+        # Guard wins over StabilizedApproachMonitor (runs earlier, pre-command).
+        if self.phase == ApproachPhase.FINAL and self.safety_guard is not None:
+            snapshot = SafetySnapshot.from_telemetry(telemetry, self.approach_config)
+            position = telemetry.get('position', {})
+            speed_data = telemetry.get('speed', {})
+            guard_result = self.safety_guard.evaluate(
+                snapshot,
+                has_altitude=position.get('altitude_agl') is not None,
+                has_radio_height=position.get('radio_height') is not None,
+                has_airspeed=speed_data.get('airspeed_indicated') is not None,
+            )
+            if guard_result.decision == GuardDecision.GO_AROUND:
+                logger.critical("SAFETY GUARD: GO_AROUND — %s %s",
+                                guard_result.reason, guard_result.details)
+                self.execute_go_around()
+                return
 
         # Периодическое логирование FMS данных
         self._log_fms_data()

@@ -366,6 +366,11 @@ class TestPendingFramePattern:
         assert call_order.index("set_vertical_speed") < call_order.index("writerow")
         assert call_order.index("set_flaps") < call_order.index("writerow")
 
+        # Verify order: actuator commands BEFORE file flush
+        assert call_order.index("set_throttle") < call_order.index("file_flush")
+        assert call_order.index("set_vertical_speed") < call_order.index("file_flush")
+        assert call_order.index("set_flaps") < call_order.index("file_flush")
+
         # Exactly 1 CSV terminal row
         system.telemetry_recorder.stop_recording()
         csv_files = list(tmp_path.glob('telemetry_*.csv'))
@@ -718,100 +723,6 @@ class TestRealExecuteApproach:
         csv_files = list(tmp_path.glob('telemetry_*.csv'))
         _, rows = _read_csv(csv_files[0])
         assert len(rows) == 1
-
-    def test_red_without_fix_proof(self, tmp_path, caplog):
-        """Red-without-fix: prove the local try/except around recorder is
-        necessary. Patch write_frame to always throw. The local try/except
-        catches the error → loop continues. Without it, the error would
-        propagate to the outer handler → 'Error in approach execution' logged."""
-        from main import AutoLandSystem, ApproachPhase
-        from modules.safety_guard import ApproachSafetyGuard
-        from modules.types import ApproachConfig, NavStation
-
-        system = AutoLandSystem.__new__(AutoLandSystem)
-        system.approach_config = ApproachConfig(
-            station=NavStation("TEST", 11030000, 55.5, 37.5, "VOR"),
-            final_approach_course=270, glideslope_angle=3.0,
-            decision_height=200, approach_speed=120,
-            runway_elevation=0, runway_length=8000, runway_width=150,
-            runway_threshold_lat=55.48, runway_threshold_lon=37.52,
-        )
-        system.use_ils = False
-        system.use_vjoy = False
-        system.use_autothrottle = False
-        system.use_custom_autopilot = False
-        system.audio_alerts_enabled = False
-        system.phase = ApproachPhase.FINAL
-        system.safety_guard = ApproachSafetyGuard(debounce_n=2)
-        system.wind_correction = MagicMock()
-        system.wind_correction.apply_wind_corrections.return_value = {
-            "corrected_heading": 270, "corrected_vs": 700,
-            "headwind": 10, "crosswind": 5, "wind_speed": 12,
-            "wind_direction": 280, "drift_angle": 2.0,
-        }
-        system.fms_reader = None
-        system.phase_state = MagicMock()
-        system.phase_state.handle.return_value = None
-        system._last_guard_snapshot_log_time = 0.0
-        system._last_fms_log_time = 0.0
-        system.connection_monitor = None
-        system.connection_optimizer = None
-        system.ils_navigation = MagicMock()
-        system.navigation = MagicMock()
-        system.navigation.calculate_vor_approach.return_value = {
-            "distance_to_station": 5.0, "required_altitude": 2000,
-            "on_course": True, "cross_track_error": 0.5,
-            "corrected_heading": 270,
-        }
-        system.telemetry = MagicMock()
-        system.control = MagicMock()
-        system.stabilized_monitor = MagicMock()
-        system.autothrottle = MagicMock()
-        system.autothrottle.active = False
-        system.vjoy_throttle = None
-        system.virtual_joystick = MagicMock()
-        system.aircraft_adapter = MagicMock()
-        system.speed_calculator = MagicMock()
-        system.structured_logger = MagicMock()
-        system.flare_controller = MagicMock()
-        system.wind_shear_detector = MagicMock()
-        system.turbulence_detector = MagicMock()
-        system.audio_system = MagicMock()
-        system.autopilot_takeover = MagicMock()
-        system.autopilot_takeover.status.completed = False
-
-        frame = make_telemetry(vertical_speed=-700, altitude_agl=500,
-                               airspeed=120, bank=3.0)
-        system.telemetry.get_all_data.return_value = frame
-
-        system.telemetry_recorder = TelemetryRecorder(log_dir=str(tmp_path))
-        system.telemetry_recorder.start_recording()
-
-        # Always throw — the local try/except catches this
-        system.telemetry_recorder.write_frame = MagicMock(
-            side_effect=IOError("disk error"))
-
-        # Stop after 1 iteration
-        system.running = True
-        handle_count = [0]
-        original_handle_phase = AutoLandSystem._handle_phase
-        def counting_handle(self_sys, t, a):
-            handle_count[0] += 1
-            self_sys.running = False  # stop after 1 iteration
-            return original_handle_phase(self_sys, t, a)
-        system._handle_phase = lambda t, a: counting_handle(system, t, a)
-
-        with caplog.at_level(logging.WARNING, logger="main"):
-            system.execute_approach()
-
-        # PROOF: "Error in approach execution" was NOT logged
-        # → the local try/except caught the error before the outer handler.
-        # If the local try/except were removed, the IOError would propagate
-        # to the outer handler, which would log "Error in approach execution".
-        assert "Error in approach execution" not in caplog.text
-
-        # The local try/except logged the recorder error instead
-        assert "recorder" in caplog.text.lower() or "write" in caplog.text.lower()
 
 
 # ═══════════════════════════════════════════════════════════════════

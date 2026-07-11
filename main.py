@@ -34,6 +34,7 @@ from modules.synthetic_glidepath import SyntheticGlidepath
 from modules.wind_correction import WindCorrection
 from modules.wind_shear_detector import WindShearDetector
 from modules.safety_guard import ApproachSafetyGuard, SafetySnapshot, GuardDecision
+from modules.telemetry_recorder import TelemetryRecorder
 
 # Настройка логирования
 logging.basicConfig(
@@ -86,6 +87,7 @@ class AutoLandSystem:
         self.speed_calculator = ApproachSpeedCalculator()
         self.autopilot_takeover = AutopilotTakeover()
         self.safety_guard = ApproachSafetyGuard()
+        self.telemetry_recorder = TelemetryRecorder()
         self.synthetic_glidepath: Optional[SyntheticGlidepath] = None
         self.approach_config: Optional[ApproachConfig] = None
         self.approach_params: Optional[dict] = None
@@ -341,6 +343,9 @@ class AutoLandSystem:
         else:  # NDB
             self.control.set_adf_frequency(self.approach_config.station.frequency)
 
+        # Start telemetry recorder
+        self.telemetry_recorder.start_recording()
+
         # Включение автопилота
         if self.use_custom_autopilot and self.aircraft_adapter:
             self.aircraft_adapter.engage_autopilot()
@@ -356,6 +361,8 @@ class AutoLandSystem:
         self.running = False
         self.phase = ApproachPhase.IDLE
         self.phase_state = None  # Сброс состояния
+        # Stop telemetry recorder
+        self.telemetry_recorder.stop_recording()
         logger.info("Approach stopped")
 
     def get_aircraft_info(self) -> dict:
@@ -528,6 +535,18 @@ class AutoLandSystem:
                 self._check_connection_optimization()
                 approach_data = self._calculate_approach_data(data)
                 self._handle_phase(data, approach_data)
+
+                # Write telemetry frame to CSV recorder
+                try:
+                    self.telemetry_recorder.write_frame(
+                        telemetry=data,
+                        phase=self.phase.value if self.phase else "UNKNOWN",
+                        guard_decision=getattr(self, '_last_guard_decision', None),
+                        guard_reason=getattr(self, '_last_guard_reason', None),
+                    )
+                except Exception:
+                    pass  # recorder errors never break the loop
+
                 consecutive_errors = 0
                 time.sleep(0.5)
 
@@ -657,6 +676,9 @@ class AutoLandSystem:
 
         # Deterministic safety guard — FINAL phase only, BEFORE any actuator commands.
         # Guard wins over StabilizedApproachMonitor (runs earlier, pre-command).
+        # Store last guard result for telemetry recorder.
+        self._last_guard_decision = None
+        self._last_guard_reason = None
         if self.phase == ApproachPhase.FINAL and self.safety_guard is not None:
             snapshot = SafetySnapshot.from_telemetry(telemetry, self.approach_config)
             position = telemetry.get('position', {})
@@ -668,6 +690,8 @@ class AutoLandSystem:
                 has_airspeed=speed_data.get('airspeed_indicated') is not None,
             )
             if guard_result.decision == GuardDecision.GO_AROUND:
+                self._last_guard_decision = "GO_AROUND"
+                self._last_guard_reason = guard_result.reason
                 logger.critical("SAFETY GUARD: GO_AROUND — %s %s",
                                 guard_result.reason, guard_result.details)
                 self.execute_go_around()
@@ -675,25 +699,45 @@ class AutoLandSystem:
 
             # Near-trigger logging: debounce counting but not yet at threshold
             if guard_result.reason.endswith("_debounce"):
+                self._last_guard_decision = "CONTINUE"
+                self._last_guard_reason = guard_result.reason
                 logger.warning("SAFETY GUARD near-trigger: %s %s",
                                guard_result.reason, guard_result.details)
+            else:
+                self._last_guard_decision = "CONTINUE"
+                self._last_guard_reason = guard_result.reason
 
-            # Periodic snapshot logging (~5 seconds)
+            # Periodic snapshot logging (~5 seconds) — full guard state
             current_time = time.time()
             if current_time - getattr(self, '_last_guard_snapshot_log_time', 0.0) > 5.0:
                 pos = telemetry.get('position', {})
                 spd = telemetry.get('speed', {})
-                logger.info("GUARD SNAPSHOT: vs=%.0f bank=%.1f ias=%.0f vref=%.0f "
-                            "rh=%s alt_agl=%s has_alt=%s has_rh=%s has_ias=%s",
-                            spd.get('vertical_speed', 0),
-                            telemetry.get('attitude', {}).get('bank', 0),
-                            spd.get('airspeed_indicated', 0),
-                            self.approach_config.approach_speed,
-                            pos.get('radio_height'),
-                            pos.get('altitude_agl'),
-                            pos.get('altitude_agl') is not None,
-                            pos.get('radio_height') is not None,
-                            spd.get('airspeed_indicated') is not None)
+                att = telemetry.get('attitude', {})
+                nav = telemetry.get('nav', {})
+                ils = telemetry.get('ils', {})
+                ap = telemetry.get('autopilot', {})
+                logger.info(
+                    "GUARD SNAPSHOT: vs=%.0f bank=%.1f ias=%.0f vref=%.0f "
+                    "rh=%s alt_agl=%s "
+                    "has_alt=%s has_rh=%s has_ias=%s "
+                    "has_nav1=%s has_localizer=%s has_glideslope=%s "
+                    "ap_master=%s guard_decision=%s guard_reason=%s",
+                    spd.get('vertical_speed', 0),
+                    att.get('bank', 0),
+                    spd.get('airspeed_indicated', 0),
+                    self.approach_config.approach_speed,
+                    pos.get('radio_height'),
+                    pos.get('altitude_agl'),
+                    pos.get('altitude_agl') is not None,
+                    pos.get('radio_height') is not None,
+                    spd.get('airspeed_indicated') is not None,
+                    nav.get('nav1_frequency') is not None,
+                    ils.get('nav1_has_localizer', False),
+                    ils.get('nav1_has_glideslope', False),
+                    ap.get('master', False),
+                    getattr(self, '_last_guard_decision', None),
+                    getattr(self, '_last_guard_reason', None),
+                )
                 self._last_guard_snapshot_log_time = current_time
 
         # Периодическое логирование FMS данных

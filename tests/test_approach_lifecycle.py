@@ -67,6 +67,7 @@ def _make_system_with_completed_takeover():
     system.audio_alerts_enabled = False
     system._last_fms_log_time = 0.0
     system._ils_info_logged = True
+    system.telemetry_recorder = MagicMock()
 
     # Симулируем завершённый takeover
     system.autopilot_takeover.status.completed = True

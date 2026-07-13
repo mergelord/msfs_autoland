@@ -227,14 +227,31 @@ class AutopilotTakeover:
         logger.info("=" * 60)
 
     def _save_initial_parameters(self, telemetry: Dict):
+        pos = telemetry.get('position', {})
+        spd = telemetry.get('speed', {})
+        att = telemetry.get('attitude', {})
+
+        altitude = pos.get('altitude')
+        altitude_agl = pos.get('altitude_agl')
+        airspeed = spd.get('airspeed_indicated')
+
+        # F5: fail-closed — incomplete telemetry → skip save, retry next tick.
+        # TakeoverConfig.initialization_timeout (30s) covers the case where
+        # telemetry never arrives.
+        if altitude is None or altitude_agl is None or airspeed is None:
+            logger.warning("Incomplete telemetry for initial params "
+                           "(alt=%s, agl=%s, ias=%s) — retry next tick",
+                           altitude, altitude_agl, airspeed)
+            return
+
         self.initial_parameters = {
-            'altitude': telemetry['position']['altitude'],
-            'altitude_agl': telemetry['position']['altitude_agl'],
-            'airspeed': telemetry['speed']['airspeed_indicated'],
-            'heading': telemetry['attitude']['heading_magnetic'],
-            'pitch': telemetry['attitude']['pitch'],
-            'bank': telemetry['attitude']['bank'],
-            'vertical_speed': telemetry['speed']['vertical_speed']
+            'altitude': altitude,
+            'altitude_agl': altitude_agl,
+            'airspeed': airspeed,
+            'heading': att.get('heading_magnetic', 0.0),
+            'pitch': att.get('pitch', 0.0),
+            'bank': att.get('bank', 0.0),
+            'vertical_speed': spd.get('vertical_speed', 0.0),
         }
         logger.info("Initial parameters saved: IAS=%.0fkt, ALT=%.0fft, HDG=%.0f°",
                      self.initial_parameters['airspeed'],
@@ -246,47 +263,58 @@ class AutopilotTakeover:
                                 decision_height: float = None) -> Dict[str, bool]:
         checks: Dict[str, bool] = {}
 
-        altitude_agl = telemetry['position']['altitude_agl']
+        pos = telemetry.get('position', {})
+        spd = telemetry.get('speed', {})
+        att = telemetry.get('attitude', {})
 
-        # FIX-9: compute altitude_safe by approach mode
-        if approach_type and approach_type.upper() == 'ILS':
+        altitude_agl = pos.get('altitude_agl')
+
+        # F5: fail-closed — missing channel → check = False
+        if altitude_agl is None:
+            checks['altitude_safe'] = False
+        elif approach_type and approach_type.upper() == 'ILS':
             if decision_height is None:
-                # fail-closed: ILS without DH → altitude not safe
                 checks['altitude_safe'] = False
             else:
                 checks['altitude_safe'] = altitude_agl > decision_height
         else:
-            # VOR/NDB/NPA: use takeover_altitude_min floor
             checks['altitude_safe'] = altitude_agl >= self.config.takeover_altitude_min
 
-        if self.config.require_stable_speed and self.initial_parameters:
-            current_speed = telemetry['speed']['airspeed_indicated']
+        airspeed = spd.get('airspeed_indicated')
+        if airspeed is None or not self.initial_parameters:
+            checks['speed_stable'] = False
+        elif self.config.require_stable_speed:
             initial_speed = self.initial_parameters['airspeed']
             checks['speed_stable'] = (
-                abs(current_speed - initial_speed) <= self.config.speed_tolerance)
+                abs(airspeed - initial_speed) <= self.config.speed_tolerance)
         else:
             checks['speed_stable'] = True
 
-        if self.config.require_stable_altitude and self.initial_parameters:
-            current_alt = telemetry['position']['altitude']
+        altitude = pos.get('altitude')
+        if altitude is None or not self.initial_parameters:
+            checks['altitude_stable'] = False
+        elif self.config.require_stable_altitude:
             initial_alt = self.initial_parameters['altitude']
             checks['altitude_stable'] = (
-                abs(current_alt - initial_alt) <= self.config.altitude_tolerance)
+                abs(altitude - initial_alt) <= self.config.altitude_tolerance)
         else:
             checks['altitude_stable'] = True
 
-        bank = abs(telemetry['attitude']['bank'])
-        pitch = telemetry['attitude']['pitch']
-        checks['attitude_safe'] = bank < 30 and -10 < pitch < 15
+        bank = att.get('bank')
+        pitch = att.get('pitch')
+        if bank is None or pitch is None:
+            checks['attitude_safe'] = False
+        else:
+            checks['attitude_safe'] = abs(bank) < 30 and -10 < pitch < 15
 
-        on_ground = telemetry['position'].get('on_ground', False)
+        on_ground = pos.get('on_ground', False)
         checks['airborne'] = not on_ground
 
-        # 6. Sink rate guard — mode-dependent classification
-        vertical_speed = telemetry['speed']['vertical_speed']
-        checks['sink_rate_safe'] = vertical_speed >= -self.config.sink_rate_max
-        # Note: sink_rate_safe classification (hard vs retryable) is determined
-        # by approach_type in perform_takeover(), not here.
+        vertical_speed = spd.get('vertical_speed')
+        if vertical_speed is None:
+            checks['sink_rate_safe'] = False
+        else:
+            checks['sink_rate_safe'] = vertical_speed >= -self.config.sink_rate_max
 
         return checks
 

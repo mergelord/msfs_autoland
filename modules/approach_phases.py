@@ -51,8 +51,8 @@ class InitialPhaseState(ApproachPhaseState):
     def handle(self, telemetry: dict, approach_data: dict, wind_data: dict) -> Optional[ApproachPhaseState]:
         """Обработка начальной фазы"""
 
-        distance = approach_data['distance_to_station']
-        cross_track = approach_data['cross_track_error']
+        distance = approach_data.get('distance_to_station', 999.0)
+        cross_track = approach_data.get('cross_track_error', 0.0)
         dme_distance = telemetry['nav'].get('nav1_dme_distance', distance)
 
         # Проверка точности DME
@@ -70,7 +70,7 @@ class InitialPhaseState(ApproachPhaseState):
         self.system.control.set_heading_hold(int(corrected_heading))
 
         # Переход к промежуточной фазе при перехвате курса
-        if approach_data['on_course'] and dme_distance < 15:
+        if approach_data.get('on_course', False) and dme_distance < 15:
             logger.info("Transitioning to INTERMEDIATE phase")
             return IntermediatePhaseState(self.system)
 
@@ -86,10 +86,10 @@ class IntermediatePhaseState(ApproachPhaseState):
     def handle(self, telemetry: dict, approach_data: dict, wind_data: dict) -> Optional[ApproachPhaseState]:
         """Обработка промежуточной фазы"""
 
-        distance = approach_data['distance_to_station']
+        distance = approach_data.get('distance_to_station', 999.0)
         altitude = telemetry['position']['altitude']
         altitude_agl = telemetry['position']['altitude_agl']
-        required_alt = approach_data['required_altitude']
+        required_alt = approach_data.get('required_altitude')
         position = telemetry['position']
 
         dme_distance = telemetry['nav'].get('nav1_dme_distance', distance)
@@ -115,8 +115,10 @@ class IntermediatePhaseState(ApproachPhaseState):
         if fix_check['has_fix']:
             fix_info = f", Fix: {fix_check['fix'].name} ({fix_check['status']}, {fix_check['deviation']:+d}ft)"
 
-        logger.info("INTERMEDIATE: DME %.1fnm, Alt %.0fft (req %.0fft), Headwind: %.1fkt%s",
-                   dme_distance, altitude, required_alt, wind_data['headwind'], fix_info)
+        logger.info("INTERMEDIATE: DME %.1fnm, Alt %.0fft (req %s), Headwind: %.1fkt%s",
+                   dme_distance, altitude,
+                   "%.0f" % required_alt if required_alt is not None else "N/A",
+                   wind_data['headwind'], fix_info)
 
         # Установка скорректированного курса (только если передача управления завершена)
         if self.system.autopilot_takeover.status.completed:
@@ -124,22 +126,33 @@ class IntermediatePhaseState(ApproachPhaseState):
             self.system.control.set_heading_hold(int(corrected_heading))
 
             # Снижение до глиссады с учётом встречного ветра
-            if altitude > required_alt + 200:
+            if required_alt is not None and altitude > required_alt + 200:
                 vs = -500
                 self.system.control.set_vertical_speed(vs)
 
-        # Переход к финальной фазе (только если передача управления завершена)
-        if distance < 8 and abs(altitude - required_alt) < 300:
-            if not self.system.autopilot_takeover.status.completed:
-                logger.warning("Waiting for takeover completion before transitioning to FINAL")
+        # Переход к финальной фазе
+        # F2: approach-type-aware gate — ILS transitions on LOC capture + distance,
+        # non-ILS requires completed takeover (original FIX-P0-1 logic).
+        if distance < 8 and required_alt is not None and abs(altitude - required_alt) < 300:
+            is_ils = (self.system.approach_config is not None
+                      and self.system.approach_config.station.type == 'ILS')
+            if is_ils:
+                # ILS: transition to FINAL on LOC/GS capture + distance.
+                # Takeover will initiate in FINAL (DH window) — do not require
+                # status.completed here (that requirement was for non-ILS).
+                if approach_data.get('on_localizer', False):
+                    logger.info("Transitioning to FINAL phase (ILS: LOC captured)")
+                    return FinalPhaseState(self.system)
             else:
-                # Активация автоматической тяги для фазы FINAL
-                if self.system.use_autothrottle:
-                    self.system.autothrottle.activate(initial_throttle=0.5)
-                    logger.info("Autothrottle activated for FINAL phase")
-
-                logger.info("Transitioning to FINAL phase")
-                return FinalPhaseState(self.system)
+                # Non-ILS: require completed takeover before FINAL
+                if self.system.autopilot_takeover.status.completed:
+                    if self.system.use_autothrottle:
+                        self.system.autothrottle.activate(initial_throttle=0.5)
+                        logger.info("Autothrottle activated for FINAL phase")
+                    logger.info("Transitioning to FINAL phase")
+                    return FinalPhaseState(self.system)
+                else:
+                    logger.warning("Waiting for takeover completion before transitioning to FINAL")
 
         return None
 

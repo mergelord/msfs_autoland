@@ -125,52 +125,70 @@ class ILSNavigation:
             'on_glideslope': abs(deviation_dots) < 0.5  # В пределах половины точки
         }
 
-    def calculate_ils_approach(self, telemetry: Dict, ils_data: Dict) -> Dict[str, any]:
+    def _geometric_distance_to_threshold(self, lat: float, lon: float) -> float:
+        """Geometric distance from aircraft to runway threshold (nm).
+
+        Uses Haversine formula with ILSConfig runway_threshold coordinates.
+        Fallback when DME is unavailable.
         """
-        Расчёт параметров ILS захода
+        R = 3440.065  # Earth radius in nm
+        lat1, lon1 = math.radians(lat), math.radians(lon)
+        lat2 = math.radians(self.config.runway_threshold_lat)
+        lon2 = math.radians(self.config.runway_threshold_lon)
+        dlat = lat2 - lat1
+        dlon = lon2 - lon1
+        a = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
+        return R * 2 * math.asin(math.sqrt(a))
 
-        Args:
-            telemetry: Телеметрия самолёта
-            ils_data: Данные ILS
+    def calculate_ils_approach(self, telemetry: Dict, ils_data: Dict) -> Dict[str, any]:
+        """Расчёт параметров ILS захода.
 
-        Returns:
-            Dict с параметрами захода
+        Returns dict with consumer-compatible keys:
+        distance_to_station (nm, geometric if no DME), cross_track_error (degrees,
+        negative = left of localizer), on_course (bool), required_altitude (ft MSL),
+        plus ILS-specific keys (localizer, glideslope, on_localizer, on_glideslope, etc.).
         """
         if not self.config:
             logger.error("ILS not configured")
             return {}
 
-        # Проверка доступности ILS
         ils_available = self.is_ils_available(ils_data)
-
         if not ils_available:
             return {
                 'ils_available': False,
                 'error': 'ILS signal not available'
             }
 
-        # Отклонения
         loc_dev = self.get_localizer_deviation(ils_data)
         gs_dev = self.get_glideslope_deviation(ils_data)
 
-        # Текущие параметры
-        altitude = telemetry['position'].get('altitude', 0)
-        ground_speed = telemetry['speed'].get('ground_speed', 0)
+        position = telemetry.get('position', {})
+        altitude = position.get('altitude', 0)
+        ground_speed = telemetry.get('speed', {}).get('ground_speed', 0)
 
-        # Расчёт требуемой высоты на глиссаде
-        dme_distance = telemetry['nav'].get('nav1_dme_distance', 0)
+        # Distance: prefer DME, fallback to geometric
+        dme_distance = telemetry.get('nav', {}).get('nav1_dme_distance', 0)
         if dme_distance > 0:
-            distance_feet = dme_distance * 6076.12
+            distance_to_threshold = dme_distance
+        else:
+            lat = position.get('latitude')
+            lon = position.get('longitude')
+            if lat is not None and lon is not None:
+                distance_to_threshold = self._geometric_distance_to_threshold(lat, lon)
+            else:
+                distance_to_threshold = 0.0
+
+        # Required altitude on glideslope (MSL)
+        if distance_to_threshold > 0:
+            distance_feet = distance_to_threshold * 6076.12
             required_altitude_agl = distance_feet * math.tan(math.radians(self.config.glideslope_angle))
             required_altitude_msl = required_altitude_agl + self.config.runway_elevation
         else:
             required_altitude_msl = altitude
 
-        # Расчёт вертикальной скорости для глиссады
         required_vs = ground_speed * math.tan(math.radians(self.config.glideslope_angle)) * 101.3
 
-        # Расчёт корректирующего курса
-        heading_correction = -loc_dev['degrees'] * 3  # Коэффициент усиления
+        heading_correction = -loc_dev['degrees'] * 3
         corrected_heading = (self.config.localizer_course + heading_correction) % 360
 
         return {
@@ -178,13 +196,16 @@ class ILSNavigation:
             'localizer': loc_dev,
             'glideslope': gs_dev,
             'dme_distance': dme_distance,
+            'distance_to_station': distance_to_threshold,
+            'cross_track_error': -loc_dev['degrees'],  # negative = left of LOC (degrees)
+            'on_course': loc_dev['on_course'],
             'required_altitude': required_altitude_msl,
             'altitude_deviation': altitude - required_altitude_msl,
             'required_vs': required_vs,
             'corrected_heading': corrected_heading,
             'on_localizer': loc_dev['on_course'],
             'on_glideslope': gs_dev['on_glideslope'],
-            'stabilized': loc_dev['on_course'] and gs_dev['on_glideslope']
+            'stabilized': loc_dev['on_course'] and gs_dev['on_glideslope'],
         }
 
     def calculate_loc_approach(self, telemetry: Dict, ils_data: Dict) -> Dict[str, any]:
@@ -194,12 +215,10 @@ class ILSNavigation:
         Vertical: synthetic glidepath (handled by SyntheticGlidepath module).
         Stabilized = only on_localizer (no glideslope check).
 
-        Args:
-            telemetry: Телеметрия самолёта
-            ils_data: Данные из телеметрии (localizer signal)
-
-        Returns:
-            Dict с параметрами захода
+        Returns dict with consumer-compatible keys:
+        distance_to_station (nm, geometric), cross_track_error (degrees),
+        on_course (bool), required_altitude (ft MSL via synthetic glidepath geometry),
+        plus LOC-specific keys (localizer, corrected_heading, on_localizer).
         """
         if not self.config:
             logger.error("LOC not configured (no ILSConfig)")
@@ -212,13 +231,35 @@ class ILSNavigation:
             }
 
         loc_dev = self.get_localizer_deviation(ils_data)
+        position = telemetry.get('position', {})
+        altitude = position.get('altitude', 0)
 
         heading_correction = -loc_dev['degrees'] * 3
         corrected_heading = (self.config.localizer_course + heading_correction) % 360
 
+        # Distance: geometric (LOC has no DME from localizer)
+        lat = position.get('latitude')
+        lon = position.get('longitude')
+        if lat is not None and lon is not None:
+            distance_to_threshold = self._geometric_distance_to_threshold(lat, lon)
+        else:
+            distance_to_threshold = 0.0
+
+        # Required altitude: synthetic glidepath geometry (same as VOR/NDB)
+        if distance_to_threshold > 0:
+            distance_feet = distance_to_threshold * 6076.12
+            required_altitude_agl = distance_feet * math.tan(math.radians(self.config.glideslope_angle))
+            required_altitude_msl = required_altitude_agl + self.config.runway_elevation
+        else:
+            required_altitude_msl = altitude
+
         return {
             'loc_available': True,
             'localizer': loc_dev,
+            'distance_to_station': distance_to_threshold,
+            'cross_track_error': -loc_dev['degrees'],  # negative = left of LOC (degrees)
+            'on_course': loc_dev['on_course'],
+            'required_altitude': required_altitude_msl,
             'corrected_heading': corrected_heading,
             'on_localizer': loc_dev['on_course'],
             'stabilized': loc_dev['on_course'],

@@ -431,6 +431,11 @@ class AutoLandSystem:
         scope = (self.control.source_scope(CommandSource.SAFETY)
                  if hasattr(self.control, "source_scope") else nullcontext())
         with scope:
+            # F3: re-engage AP master BEFORE sending AP commands.
+            # Idempotent: safe even if takeover hasn't happened.
+            self.control.set_autopilot_master(True)
+            logger.info("Go-around: AP master re-engaged")
+
             if self.vjoy_throttle and self.vjoy_throttle.enabled:
                 self.vjoy_throttle.set_throttle(1.0)
             else:
@@ -443,9 +448,9 @@ class AutoLandSystem:
             self.control.set_flaps(2)
             logger.info("Go-around: Flaps to takeoff position")
 
-        # 4. Уборка шасси (после положительного набора)
-        # Шасси убираем только если набираем высоту
-        logger.info("Go-around: Gear up after positive climb")
+        # F3: real gear UP command (was a comment before)
+        self.control.set_gear(False)
+        logger.info("Go-around: Gear UP")
 
         # 5. Если vJoy доступен, центрируем управление
         if self.use_vjoy:
@@ -588,12 +593,17 @@ class AutoLandSystem:
 
                 # Останавливаем заход только после нескольких подряд ошибок,
                 # чтобы transient SimConnect glitch не обрывал автолендинг сразу
+                # F4: after takeover, error budget triggers go-around (not bare stop).
+                # Pre-takeover: stop is safe (AP master is still on).
                 if consecutive_errors >= max_consecutive_errors:
                     logger.critical(
                         "Too many consecutive errors (%d) - stopping approach",
                         consecutive_errors
                     )
-                    self.stop_approach()
+                    if self.autopilot_takeover.status.completed:
+                        self.execute_go_around()
+                    else:
+                        self.stop_approach()
                     break
 
                 # Пауза перед retry, чтобы дать SimConnect восстановиться
@@ -711,11 +721,14 @@ class AutoLandSystem:
             snapshot = SafetySnapshot.from_telemetry(telemetry, self.approach_config)
             position = telemetry.get('position', {})
             speed_data = telemetry.get('speed', {})
+            attitude_data = telemetry.get('attitude', {})
             guard_result = self.safety_guard.evaluate(
                 snapshot,
                 has_altitude=position.get('altitude_agl') is not None,
                 has_radio_height=position.get('radio_height') is not None,
                 has_airspeed=speed_data.get('airspeed_indicated') is not None,
+                has_vs=speed_data.get('vertical_speed') is not None,
+                has_bank=attitude_data.get('bank') is not None,
             )
             if guard_result.decision == GuardDecision.GO_AROUND:
                 self._last_guard_decision = "GO_AROUND"

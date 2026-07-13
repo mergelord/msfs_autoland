@@ -181,8 +181,8 @@ class WindCorrection:
                 ground_speed, config.glideslope_angle
             )
             return {
-                'wind_speed': wind_speed,
-                'wind_direction': wind_direction,
+                'wind_speed': 0.0,
+                'wind_direction': 0.0,
                 'headwind': 0.0,
                 'crosswind': 0.0,
                 'drift_angle': 0.0,
@@ -239,7 +239,9 @@ class WindCorrection:
         Returns:
             Вертикальная скорость (футы/мин). 0.0 если угол вне (0, 10].
         """
-        if glideslope_angle <= 0 or glideslope_angle > 10:
+        if (not math.isfinite(glideslope_angle)
+                or glideslope_angle <= 0
+                or glideslope_angle > 10):
             logger.warning(
                 "Glideslope angle %.1f° outside valid range (0, 10]; returning 0.0",
                 glideslope_angle,

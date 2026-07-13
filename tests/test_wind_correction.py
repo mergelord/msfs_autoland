@@ -121,14 +121,13 @@ class TestInvalidWindFailClosed:
 
     def test_all_outputs_finite(self):
         wc = WindCorrection()
-        raw_keys = {'wind_speed', 'wind_direction'}
         for ws, wd in [(float('nan'), 90), (20, float('inf')), (-5, 0)]:
             telemetry = _make_telemetry(wind_speed=ws, wind_direction=wd)
             result = wc.apply_wind_corrections(telemetry, {}, _Config())
             for k, v in result.items():
-                if k in raw_keys:
-                    continue  # raw inputs returned as-is for logging
                 assert math.isfinite(v), f"{k}={v} not finite (ws={ws}, wd={wd})"
+            assert result['wind_speed'] == 0.0
+            assert result['wind_direction'] == 0.0
 
 
 # ── 4. Descent rate validation ──────────────────────────────────────
@@ -155,6 +154,15 @@ class TestDescentRateValidation:
     def test_angle_11_returns_zero(self):
         wc = WindCorrection()
         assert wc.calculate_descent_rate(100, 11) == 0.0
+
+    @pytest.mark.parametrize("angle", [float('nan'), float('inf'), float('-inf')])
+    def test_nonfinite_angle_returns_zero(self, angle, caplog):
+        wc = WindCorrection()
+        with caplog.at_level(logging.WARNING):
+            result = wc.calculate_descent_rate(100, angle)
+        assert result == 0.0
+        assert math.isfinite(result)
+        assert len(caplog.messages) > 0
 
 
 # ── 5. No headwind double-counting ──────────────────────────────────

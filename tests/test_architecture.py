@@ -18,7 +18,10 @@ import pytest
 class ArchitectureAnalyzer:
     """Анализатор архитектуры проекта"""
 
-    def __init__(self, project_root: str = "C:/BAT/msfs_autoland"):
+    def __init__(self, project_root: str = None):
+        if project_root is None:
+            # Resolve relative to this test file's directory
+            project_root = str(Path(__file__).resolve().parent.parent)
         self.project_root = Path(project_root)
         self.modules_dir = self.project_root / "modules"
 

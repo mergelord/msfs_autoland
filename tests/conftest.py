@@ -9,10 +9,11 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-# Mock SimConnect before any project module imports it at module level.
-# In CI there is no SimConnect SDK; tests use fakes/mocks exclusively.
-if 'SimConnect' not in sys.modules:
-    sys.modules['SimConnect'] = MagicMock()
+# Mock SimConnect and pyvjoy before any project module imports them at module level.
+# In CI there is no SimConnect SDK or vJoy driver; tests use fakes/mocks exclusively.
+for _mod in ('SimConnect', 'pyvjoy', 'pyvjoy._sdk'):
+    if _mod not in sys.modules:
+        sys.modules[_mod] = MagicMock()
 
 import pytest
 from tests.fakes import FakeAircraftAdapter, FakeClock, FakeControl, FakeVJoy

@@ -110,7 +110,9 @@ class ApproachSafetyGuard:
     def evaluate(self, snapshot: SafetySnapshot,
                  has_altitude: bool = True,
                  has_radio_height: bool = True,
-                 has_airspeed: bool = True) -> GuardResult:
+                 has_airspeed: bool = True,
+                 has_vs: bool = True,
+                 has_bank: bool = True) -> GuardResult:
         """Evaluate snapshot against all rules.
 
         All rules evaluated every frame. Per-rule counter resets on clean frame.
@@ -121,18 +123,21 @@ class ApproachSafetyGuard:
             has_altitude: True if altitude_agl was present in telemetry.
             has_radio_height: True if radio_height was present in telemetry.
             has_airspeed: True if airspeed_indicated was present in telemetry.
+            has_vs: True if vertical_speed was present in telemetry.
+            has_bank: True if bank was present in telemetry.
         """
         if self._go_around_executed:
             return GuardResult(GuardDecision.CONTINUE, "already_go_around", {})
 
         first_debounce = None  # track first rule in debounce for reason
 
-        # G5: Invalid critical telemetry
+        # G5: Invalid critical telemetry (height, airspeed, VS, or bank missing)
         has_height = has_radio_height or has_altitude
-        g5_violated = not has_height or not has_airspeed
+        g5_violated = not has_height or not has_airspeed or not has_vs or not has_bank
         status = self._check_rule(
             "INVALID_TELEMETRY", g5_violated,
-            {"has_height": has_height, "has_airspeed": has_airspeed})
+            {"has_height": has_height, "has_airspeed": has_airspeed,
+             "has_vs": has_vs, "has_bank": has_bank})
         if status[0] == "go_around":
             return status[1]
         if status[0] == "debounce" and first_debounce is None:

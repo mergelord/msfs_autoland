@@ -155,3 +155,101 @@ def test_calculate_approach_speeds_fallback_weight():
 
     system._calculate_approach_speeds(config)
     assert captured_kwargs['aircraft_weight_kg'] == pytest.approx(60000, rel=1e-4)
+
+
+# --- Finding 1: kg/lbs unit mismatch ---
+
+def test_throttle_weight_conversion_kg_to_lbs():
+    """Finding 1: _control_throttle converts kg to lbs before passing to autothrottle."""
+    from modules.approach_phases import FinalPhaseState
+    from modules.autothrottle import AutothrottleController, AutothrottleConfig
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    # Create a system with real autothrottle that records input weight
+    captured_weight = {}
+    real_autothrottle = AutothrottleController.__new__(AutothrottleController)
+    real_autothrottle.config = AutothrottleConfig()
+    real_autothrottle.active = True
+    real_autothrottle.enabled = False
+
+    # Spy on calculate_throttle to capture the weight argument
+    original_calc = AutothrottleController.calculate_throttle
+    def spy_calc(self, telemetry, target_speed, wind_data, aircraft_weight):
+        captured_weight['value'] = aircraft_weight
+        # Return minimal valid result
+        return {'throttle': 0.5, 'is_stable': True, 'asymmetric_mode': False}
+    real_autothrottle.calculate_throttle = lambda *a, **kw: spy_calc(real_autothrottle, *a, **kw)
+
+    system = MagicMock()
+    system.use_autothrottle = True
+    system.autothrottle = real_autothrottle
+    system.approach_params = {'aircraft_weight_kg': 60000.0, 'vapp': 120}
+    system.vjoy_throttle = None
+    system.control = MagicMock()
+    system.use_vjoy = False
+
+    # Simulate ownership allowing throttle
+    state = FinalPhaseState.__new__(FinalPhaseState)
+    state.system = system
+    state._ownership = SimpleNamespace(throttle=MagicMock())  # AIRCRAFT_AP
+    state._ownership.throttle = type('O', (), {'value': 'AIRCRAFT_AP'})()
+
+    wind_data = {'corrected_vs': 500, 'corrected_heading': 270, 'headwind': 10,
+                 'crosswind': 5, 'drift_angle': 2.0}
+    telemetry = {'position': {'altitude_agl': 500}, 'speed': {'vertical_speed': -500}}
+
+    # Mock ownership to allow throttle
+    from modules.control_ownership import ControlOwner
+    state._ownership = SimpleNamespace(throttle=ControlOwner.AIRCRAFT_AP)
+
+    state._control_throttle(telemetry, wind_data)
+
+    # 60000 kg should be converted to ~132277 lbs before passing to autothrottle
+    assert 'value' in captured_weight, "calculate_throttle was not called"
+    assert captured_weight['value'] == pytest.approx(60000 * 2.20462, rel=1e-4), \
+        f"Expected ~132277 lbs, got {captured_weight['value']}"
+
+
+def test_calculate_base_throttle_with_lbs():
+    """Finding 1: calculate_base_throttle expects lbs, verify with known lbs value."""
+    from modules.autothrottle import AutothrottleController, AutothrottleConfig
+
+    ctrl = AutothrottleController.__new__(AutothrottleController)
+    ctrl.config = AutothrottleConfig()
+
+    # 5000 lbs = reference weight → correction should be 0
+    result_ref = ctrl.calculate_base_throttle(5000.0, 0, False)
+    # 10000 lbs → positive correction
+    result_heavy = ctrl.calculate_base_throttle(10000.0, 0, False)
+    # 0 lbs → negative correction
+    result_light = ctrl.calculate_base_throttle(0.0, 0, False)
+
+    assert result_heavy > result_ref, "Heavier aircraft should need more throttle"
+    assert result_light < result_ref, "Lighter aircraft should need less throttle"
+    # Verify the correction magnitude: (10000-5000)*0.00002 = 0.1
+    assert result_heavy - result_ref == pytest.approx(0.1, abs=1e-6)
+
+
+# --- Finding 4: _calculate_headwind NaN propagation ---
+
+def test_headwind_nan_input():
+    """Finding 4: NaN wind_speed must not propagate NaN headwind."""
+    from main import AutoLandSystem
+
+    system = AutoLandSystem.__new__(AutoLandSystem)
+    result = system._calculate_headwind(float('nan'), 10.0, 270)
+    assert result == 0.0, f"NaN wind_direction should return 0.0, got {result}"
+
+    result2 = system._calculate_headwind(0.0, float('nan'), 270)
+    assert result2 == 0.0, f"NaN wind_speed should return 0.0, got {result2}"
+
+
+def test_headwind_normal():
+    """Finding 4: normal inputs still work."""
+    from main import AutoLandSystem
+
+    system = AutoLandSystem.__new__(AutoLandSystem)
+    result = system._calculate_headwind(0.0, 10.0, 270)
+    assert isinstance(result, float)
+    assert -10 <= result <= 10

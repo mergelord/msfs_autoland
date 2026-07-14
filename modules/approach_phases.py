@@ -4,6 +4,7 @@
 """
 
 import logging
+import math
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Optional
 
@@ -485,6 +486,10 @@ class FinalPhaseState(ApproachPhaseState):
                 )
             else:
                 vs = wind_data['corrected_vs']
+            # Guard against NaN/inf in vs before int() cast (Finding 2)
+            if not math.isfinite(vs):
+                logger.warning("Non-finite vs=%s, holding current VS", vs)
+                vs = 0.0
             self.system.control.set_vertical_speed(-int(vs))
 
     def _control_throttle(self, telemetry: dict, wind_data: dict):
@@ -498,14 +503,15 @@ class FinalPhaseState(ApproachPhaseState):
             else:
                 target_speed = self.system.approach_config.approach_speed
 
-            # Получение веса самолёта
-            aircraft_weight = self._get_aircraft_weight(telemetry)
+            # Получение веса самолёта (kg -> lbs for autothrottle which expects lbs)
+            aircraft_weight_kg = self._get_aircraft_weight(telemetry)
+            aircraft_weight_lbs = aircraft_weight_kg * 2.20462  # kg to lbs
 
             throttle_data = self.system.autothrottle.calculate_throttle(
                 telemetry,
                 target_speed,
                 wind_data,
-                aircraft_weight
+                aircraft_weight_lbs
             )
 
             # Применение тяги — only if throttle owner is AIRCRAFT_AP

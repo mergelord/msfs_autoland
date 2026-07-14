@@ -348,8 +348,12 @@ class Navigation:
         # Вычисление координат точки входа
         # 1 морская миля = 1/60 градуса широты
         lat_change = distance_nm * math.cos(math.radians(reverse_heading)) / 60.0
-        lon_change = distance_nm * math.sin(math.radians(reverse_heading)) / \
-                     (60.0 * math.cos(math.radians(runway_threshold_lat)))
+        cos_lat = math.cos(math.radians(runway_threshold_lat))
+        if abs(cos_lat) < 1e-6:
+            logger.warning("cos(lat) ≈ 0 at lat=%.1f°, longitude change undefined", runway_threshold_lat)
+            lon_change = 0.0
+        else:
+            lon_change = distance_nm * math.sin(math.radians(reverse_heading)) / (60.0 * cos_lat)
 
         intercept_lat = runway_threshold_lat + lat_change
         intercept_lon = runway_threshold_lon + lon_change
@@ -551,16 +555,21 @@ class Navigation:
 
         # Координаты дальнего привода
         outer_lat_change = outer_distance_nm * math.cos(math.radians(reverse_heading)) / 60.0
-        outer_lon_change = outer_distance_nm * math.sin(math.radians(reverse_heading)) / \
-                          (60.0 * math.cos(math.radians(runway_threshold_lat)))
+        cos_lat = math.cos(math.radians(runway_threshold_lat))
+        if abs(cos_lat) < 1e-6:
+            outer_lon_change = 0.0
+        else:
+            outer_lon_change = outer_distance_nm * math.sin(math.radians(reverse_heading)) / (60.0 * cos_lat)
 
         outer_lat = runway_threshold_lat + outer_lat_change
         outer_lon = runway_threshold_lon + outer_lon_change
 
         # Координаты ближнего привода
         inner_lat_change = inner_distance_nm * math.cos(math.radians(reverse_heading)) / 60.0
-        inner_lon_change = inner_distance_nm * math.sin(math.radians(reverse_heading)) / \
-                          (60.0 * math.cos(math.radians(runway_threshold_lat)))
+        if abs(cos_lat) < 1e-6:
+            inner_lon_change = 0.0
+        else:
+            inner_lon_change = inner_distance_nm * math.sin(math.radians(reverse_heading)) / (60.0 * cos_lat)
 
         inner_lat = runway_threshold_lat + inner_lat_change
         inner_lon = runway_threshold_lon + inner_lon_change

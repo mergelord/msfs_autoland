@@ -543,6 +543,12 @@ class AutoLandSystem:
         """
         import math
 
+        # Guard against NaN/inf inputs (Finding 4)
+        if not _is_finite_number(wind_speed) or not _is_finite_number(wind_direction):
+            logger.warning("Non-finite headwind inputs: speed=%s, direction=%s; returning 0",
+                           wind_speed, wind_direction)
+            return 0.0
+
         wind_angle = abs(wind_direction - runway_heading)
         if wind_angle > 180:
             wind_angle = 360 - wind_angle
@@ -788,11 +794,11 @@ class AutoLandSystem:
                     self.approach_config.approach_speed,
                     pos.get('radio_height'),
                     pos.get('altitude_agl'),
-                    spd.get('vertical_speed') is not None,
-                    att.get('bank') is not None,
-                    spd.get('airspeed_indicated') is not None,
-                    pos.get('altitude_agl') is not None,
-                    pos.get('radio_height') is not None,
+                    _is_finite_number(spd.get('vertical_speed')),
+                    _is_finite_number(att.get('bank')),
+                    _is_finite_number(spd.get('airspeed_indicated')),
+                    _is_finite_number(pos.get('altitude_agl')),
+                    _is_finite_number(pos.get('radio_height')),
                     nav.get('nav1_frequency') is not None,
                     ils.get('nav1_has_localizer', False),
                     ils.get('nav1_has_glideslope', False),

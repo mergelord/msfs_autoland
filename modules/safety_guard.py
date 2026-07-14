@@ -29,6 +29,14 @@ def _safe_float(value, default: float) -> float:
         return default
     return f if math.isfinite(f) else default
 
+
+def _is_finite_number(value) -> bool:
+    """Return True if value is a finite number (not None, NaN, or inf)."""
+    try:
+        return value is not None and math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return False
+
 # Debounce: consecutive frames before GO_AROUND
 DEBOUNCE_N = 2
 
@@ -73,7 +81,13 @@ class SafetySnapshot:
         altitude_agl = position.get('altitude_agl')
         radio_height = position.get('radio_height')
 
-        height = radio_height if radio_height is not None else altitude_agl
+        # Prefer finite radio_height; fall back to finite altitude_agl
+        if _is_finite_number(radio_height):
+            height = radio_height
+        elif _is_finite_number(altitude_agl):
+            height = altitude_agl
+        else:
+            height = None  # both invalid; G5 will flag via has_* flags
 
         return cls(
             altitude_agl=_safe_float(altitude_agl, 0.0),

@@ -44,3 +44,114 @@ def test_weight_conversion():
     """FIX-05b: 132277 lbs -> ~60000 kg."""
     result = 132277 * 0.453592
     assert abs(result - 59999) < 5
+
+
+# --- REM-02: Production-path regression test for FIX-05 ---
+
+def test_calculate_approach_speeds_kwargs():
+    """REM-02: _calculate_approach_speeds passes correct units to calculator."""
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    # Fake telemetry
+    fake_telemetry = {
+        'weather': {
+            'wind_direction': 0,
+            'wind_velocity': 0,
+            'wind_gust': 0,
+            'ambient_temperature': 15,
+        },
+        'aircraft': {'title': 'Test Aircraft'},
+        'weight': {'total_weight': 132277},
+    }
+
+    # Spy on speed_calculator
+    captured_kwargs = {}
+    fake_calculator = MagicMock()
+    fake_calculator.calculate_approach_parameters.side_effect = lambda **kw: (
+        captured_kwargs.update(kw),
+        {
+            'aircraft_name': 'Test', 'flaps_configuration': 'LANDING',
+            'vref': 120, 'vapp': 125,
+            'wind_correction': 0, 'gust_correction': 0,
+            'altitude_correction': 0, 'temperature_correction': 0,
+            'weight_ok': True, 'aircraft_weight_kg': kw.get('aircraft_weight_kg', 60000),
+            'max_landing_weight_kg': 70000,
+        }
+    )[1]
+
+    # Build minimal system
+    from main import AutoLandSystem
+    system = AutoLandSystem.__new__(AutoLandSystem)
+    system.telemetry = MagicMock()
+    system.telemetry.get_all_data.return_value = fake_telemetry
+    system.speed_calculator = fake_calculator
+    system.connection_monitor = None
+    system.connection_optimizer = None
+    system.structured_logger = MagicMock()
+
+    # Config
+    config = SimpleNamespace(
+        runway_length=8000,
+        runway_elevation=0,
+        final_approach_course=0,
+        approach_speed=120,
+        glideslope_angle=3.0,
+        decision_height=200,
+        station=SimpleNamespace(type='VOR', name='Test', frequency=11030000),
+    )
+
+    # Call real method
+    system._calculate_approach_speeds(config)
+
+    # Assert captured kwargs
+    assert captured_kwargs['runway_length_m'] == pytest.approx(8000 / 3.28084, rel=1e-4)
+    assert captured_kwargs['aircraft_weight_kg'] == pytest.approx(132277 * 0.453592, rel=1e-4)
+    assert captured_kwargs['aircraft_title'] == 'Test Aircraft'
+
+
+def test_calculate_approach_speeds_fallback_weight():
+    """REM-02: Fallback to 60000 kg when total_weight is absent."""
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    fake_telemetry = {
+        'weather': {
+            'wind_direction': 0, 'wind_velocity': 0,
+            'wind_gust': 0, 'ambient_temperature': 15,
+        },
+        'aircraft': {'title': 'Test'},
+        'weight': {},  # no total_weight
+    }
+
+    captured_kwargs = {}
+    fake_calculator = MagicMock()
+    fake_calculator.calculate_approach_parameters.side_effect = lambda **kw: (
+        captured_kwargs.update(kw),
+        {
+            'aircraft_name': 'Test', 'flaps_configuration': 'LANDING',
+            'vref': 120, 'vapp': 125,
+            'wind_correction': 0, 'gust_correction': 0,
+            'altitude_correction': 0, 'temperature_correction': 0,
+            'weight_ok': True, 'aircraft_weight_kg': 60000,
+            'max_landing_weight_kg': 70000,
+        }
+    )[1]
+
+    from main import AutoLandSystem
+    system = AutoLandSystem.__new__(AutoLandSystem)
+    system.telemetry = MagicMock()
+    system.telemetry.get_all_data.return_value = fake_telemetry
+    system.speed_calculator = fake_calculator
+    system.connection_monitor = None
+    system.connection_optimizer = None
+    system.structured_logger = MagicMock()
+
+    config = SimpleNamespace(
+        runway_length=8000, runway_elevation=0, final_approach_course=0,
+        approach_speed=120, glideslope_angle=3.0, decision_height=200,
+        station=SimpleNamespace(type='VOR', name='Test', frequency=11030000),
+    )
+
+    system._calculate_approach_speeds(config)
+    assert captured_kwargs['aircraft_weight_kg'] == pytest.approx(60000, rel=1e-4)

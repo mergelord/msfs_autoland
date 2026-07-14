@@ -36,7 +36,7 @@ from modules.virtual_joystick import VirtualJoystick
 from modules.synthetic_glidepath import SyntheticGlidepath
 from modules.wind_correction import WindCorrection
 from modules.wind_shear_detector import WindShearDetector
-from modules.safety_guard import ApproachSafetyGuard, SafetySnapshot, GuardDecision
+from modules.safety_guard import ApproachSafetyGuard, SafetySnapshot, GuardDecision, _is_finite_number
 from modules.telemetry_recorder import TelemetryRecorder
 
 # Настройка логирования
@@ -734,11 +734,11 @@ class AutoLandSystem:
             attitude_data = telemetry.get('attitude', {})
             guard_result = self.safety_guard.evaluate(
                 snapshot,
-                has_altitude=position.get('altitude_agl') is not None,
-                has_radio_height=position.get('radio_height') is not None,
-                has_airspeed=speed_data.get('airspeed_indicated') is not None,
-                has_vs=speed_data.get('vertical_speed') is not None,
-                has_bank=attitude_data.get('bank') is not None,
+                has_altitude=_is_finite_number(position.get('altitude_agl')),
+                has_radio_height=_is_finite_number(position.get('radio_height')),
+                has_airspeed=_is_finite_number(speed_data.get('airspeed_indicated')),
+                has_vs=_is_finite_number(speed_data.get('vertical_speed')),
+                has_bank=_is_finite_number(attitude_data.get('bank')),
             )
             if guard_result.decision == GuardDecision.GO_AROUND:
                 self._last_guard_decision = "GO_AROUND"

@@ -1,5 +1,4 @@
 """Tests for Navigation (FIX-04)."""
-import pytest
 
 
 def test_landing_distance_zero_gs():

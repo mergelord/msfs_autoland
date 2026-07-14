@@ -1,0 +1,29 @@
+{
+  "scenario": "gateway_command_rejected",
+  "phase_before": null,
+  "phase_after": null,
+  "go_around": false,
+  "stop": false,
+  "exception": null,
+  "entries": [
+    {
+      "index": 1,
+      "command": "set_heading_hold()",
+      "authorization": "REJECTED",
+      "backend": "command_gateway.py:61",
+      "args": {
+        "source": "EXTERNAL",
+        "owner": "AIRCRAFT_AP"
+      },
+      "result": "Rejected set_heading_hold: source=external, owner=aircraft_ap"
+    },
+    {
+      "index": 2,
+      "command": "raw_control.set_heading_hold()",
+      "authorization": "NOT_CALLED",
+      "backend": "control.py",
+      "args": {},
+      "result": "blocked by gateway"
+    }
+  ]
+}

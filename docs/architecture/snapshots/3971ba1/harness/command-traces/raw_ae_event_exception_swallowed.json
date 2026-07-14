@@ -1,0 +1,34 @@
+{
+  "scenario": "raw_ae_event_exception_swallowed",
+  "phase_before": null,
+  "phase_after": null,
+  "go_around": false,
+  "stop": false,
+  "exception": null,
+  "entries": [
+    {
+      "index": 1,
+      "command": "control.set_vertical_speed()",
+      "authorization": "GATEWAY_GUARDED",
+      "backend": "control.py:107",
+      "args": {},
+      "result": "called"
+    },
+    {
+      "index": 2,
+      "command": "ae.event() → Exception",
+      "authorization": "N/A",
+      "backend": "control.py:110",
+      "args": {},
+      "result": "SimConnect failed"
+    },
+    {
+      "index": 3,
+      "command": "except Exception → logged",
+      "authorization": "N/A",
+      "backend": "control.py:113",
+      "args": {},
+      "result": "exception swallowed"
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "scenario": "non_ils_synthetic_glidepath",
+  "phase_before": null,
+  "phase_after": null,
+  "go_around": false,
+  "stop": false,
+  "exception": null,
+  "entries": [
+    {
+      "index": 1,
+      "command": "FinalPhaseState.handle()",
+      "authorization": "GATEWAY_GUARDED",
+      "backend": "approach_phases.py",
+      "args": {},
+      "result": "called"
+    },
+    {
+      "index": 2,
+      "command": "synthetic_glidepath.compute_target_vs()",
+      "authorization": "N/A",
+      "backend": "synthetic_glidepath.py",
+      "args": {},
+      "result": "target VS computed"
+    },
+    {
+      "index": 3,
+      "command": "control.set_vertical_speed()",
+      "authorization": "GATEWAY_GUARDED",
+      "backend": "control.py",
+      "args": {},
+      "result": "VS set"
+    }
+  ]
+}

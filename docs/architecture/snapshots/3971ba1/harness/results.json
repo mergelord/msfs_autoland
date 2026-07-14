@@ -1,0 +1,111 @@
+{
+  "scenarios": [
+    {
+      "id": "ils_final_ap",
+      "description": "ILS FINAL, AP owner — real FinalPhaseState.handle()",
+      "status": "PASS",
+      "detail": {
+        "gateway_used": true
+      },
+      "error": null
+    },
+    {
+      "id": "ils_final_vjoy",
+      "description": "ILS FINAL, vJoy owner — real FinalPhaseState.handle()",
+      "status": "PASS",
+      "detail": {
+        "vjoy_applied": true
+      },
+      "error": null
+    },
+    {
+      "id": "non_ils_synthetic_glidepath",
+      "description": "non-ILS with synthetic glidepath",
+      "status": "PASS",
+      "detail": {
+        "synth_called": true
+      },
+      "error": null
+    },
+    {
+      "id": "safety_guard_goaround",
+      "description": "SafetyGuard GO_AROUND — real main._handle_phase()",
+      "status": "PASS",
+      "detail": {
+        "guard_go_around": true
+      },
+      "error": null
+    },
+    {
+      "id": "stabilized_monitor_goaround",
+      "description": "StabilizedMonitor GO_AROUND — real FinalPhaseState.handle()",
+      "status": "PASS",
+      "detail": {
+        "stabilization_triggered": true
+      },
+      "error": null
+    },
+    {
+      "id": "loc_signal_loss",
+      "description": "LOC signal loss — real _calculate_approach_data returns None → go-around",
+      "status": "PASS",
+      "detail": {
+        "result_is_none": true,
+        "loc_called": true,
+        "ils_not_called": true
+      },
+      "error": null
+    },
+    {
+      "id": "takeover_initiation",
+      "description": "Takeover initiation — real IntermediatePhaseState.handle()",
+      "status": "PASS",
+      "detail": {
+        "initiated": true,
+        "performed": true
+      },
+      "error": null
+    },
+    {
+      "id": "takeover_failure",
+      "description": "Takeover failure — real FinalPhaseState.handle() → go-around",
+      "status": "PASS",
+      "detail": {
+        "takeover_failed": true,
+        "go_around": true
+      },
+      "error": null
+    },
+    {
+      "id": "missing_telemetry",
+      "description": "Missing telemetry — real execute_approach loop with error budget",
+      "status": "PASS",
+      "detail": {
+        "errors": 3,
+        "action": "stop_approach"
+      },
+      "error": null
+    },
+    {
+      "id": "raw_ae_event_exception_swallowed",
+      "description": "MSFSControl.set_* swallows exceptions — fail-silent",
+      "status": "PASS",
+      "detail": {
+        "exception_swallowed": true
+      },
+      "error": null
+    },
+    {
+      "id": "gateway_command_rejected",
+      "description": "CommandGateway rejects mismatched source/owner",
+      "status": "PASS",
+      "detail": {
+        "rejected": true
+      },
+      "error": null
+    }
+  ],
+  "total": 11,
+  "passed": 11,
+  "failed": 0
+}

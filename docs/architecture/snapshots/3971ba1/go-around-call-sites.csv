@@ -1,0 +1,11 @@
+file,line,enclosing_function,call,evidence
+modules\approach_phases.py,244,_perform_takeover,self.execute_go_around(),STATIC_CONFIRMED
+modules\approach_phases.py,373,_perform_takeover,self.execute_go_around(),STATIC_CONFIRMED
+modules\approach_phases.py,408,_check_weather_conditions,self.execute_go_around(),STATIC_CONFIRMED
+modules\approach_phases.py,578,_check_stabilization,self.execute_go_around(),STATIC_CONFIRMED
+modules\approach_phases.py,618,_check_final_stabilization,self.execute_go_around(),STATIC_CONFIRMED
+modules\approach_phases.py,313,handle,self.execute_go_around(),STATIC_CONFIRMED
+main.py,746,_handle_phase,self.execute_go_around(),STATIC_CONFIRMED
+main.py,684,_calculate_approach_data,self.execute_go_around(),STATIC_CONFIRMED
+main.py,604,execute_approach,self.execute_go_around(),STATIC_CONFIRMED
+gui.py,1489,go_around,self.execute_go_around(),STATIC_CONFIRMED

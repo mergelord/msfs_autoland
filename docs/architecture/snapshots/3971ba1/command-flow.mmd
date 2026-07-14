@@ -1,0 +1,23 @@
+﻿flowchart TB
+    subgraph Request["Command Request"]
+        PHASE["PhaseState handle()"]
+        GUARD["SafetyGuard main._handle_phase"]
+    end
+    subgraph Ownership["Ownership"]
+        COMPUTE["compute_ownership() control_ownership.py:34"]
+        GW["CommandGateway source_scope()"]
+        AUTH["_authorize() allow / CommandRejected"]
+    end
+    subgraph Backends["Actuator Backends"]
+        SIM["control.py SimConnect events"]
+        VJOY["virtual_joystick.py vJoy HID axes"]
+        ADAPT["aircraft_adapter.py WASM/LVAR"]
+    end
+    PHASE --> COMPUTE
+    PHASE --> GW
+    GUARD --> GW
+    GW --> AUTH
+    AUTH --> SIM
+    AUTH --> VJOY
+    AUTH --> ADAPT
+    GW -->|"SAFETY override bypasses auth"| SIM

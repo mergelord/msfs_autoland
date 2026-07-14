@@ -1,0 +1,50 @@
+digraph data_flow {
+    rankdir=LR;
+    node [shape=box, style=filled, fontname="Arial", fontsize=9];
+
+    subgraph cluster_source {
+        label="SimConnect Source"; style=filled; fillcolor="#e3f2fd";
+        SIM [label="SimConnect\nget_all_data()", fillcolor="#bbdefb"];
+    }
+
+    subgraph cluster_telemetry {
+        label="Telemetry Dict"; style=filled; fillcolor="#e8f5e9";
+        POS [label="position\nlat/lon/alt_agl/rh", fillcolor="#c8e6c9"];
+        SPD [label="speed\nias/gs/vs", fillcolor="#c8e6c9"];
+        ATT [label="attitude\nheading/bank/pitch", fillcolor="#c8e6c9"];
+        NAV [label="nav\nnav1_freq/dme/cdi", fillcolor="#c8e6c9"];
+        ILS [label="ils\nloc/gs/dev", fillcolor="#c8e6c9"];
+    }
+
+    subgraph cluster_calc {
+        label="Calculation Modules"; style=filled; fillcolor="#fff3e0";
+        NAV_MOD [label="navigation.py\nVOR approach", fillcolor="#ffe0b2"];
+        ILS_MOD [label="ils_navigation.py\nILS/LOC approach", fillcolor="#ffe0b2"];
+        WIND [label="wind_correction.py\ncorrected_heading", fillcolor="#ffe0b2"];
+        SYNTH [label="synthetic_glidepath.py\ntarget VS", fillcolor="#ffe0b2"];
+        SPEED [label="approach_speed_calculator.py\nVREF/VAPP", fillcolor="#ffe0b2"];
+    }
+
+    subgraph cluster_phase {
+        label="Phase Logic"; style=filled; fillcolor="#f3e5f5";
+        PHASE [label="approach_phases.py\nFinalPhaseState", fillcolor="#e1bee7"];
+    }
+
+    subgraph cluster_output {
+        label="Actuator Commands"; style=filled; fillcolor="#fce4ec";
+        HDG [label="heading", fillcolor="#f8bbd0"];
+        VS [label="vertical_speed", fillcolor="#f8bbd0"];
+        THR [label="throttle", fillcolor="#f8bbd0"];
+        FLAPS [label="flaps/gear", fillcolor="#f8bbd0"];
+    }
+
+    SIM -> POS; SIM -> SPD; SIM -> ATT; SIM -> NAV; SIM -> ILS;
+    POS -> NAV_MOD; SPD -> NAV_MOD; ATT -> NAV_MOD;
+    POS -> ILS_MOD; SPD -> ILS_MOD; ATT -> ILS_MOD; ILS -> ILS_MOD;
+    POS -> WIND; SPD -> WIND; ATT -> WIND;
+    POS -> SYNTH; SPD -> SYNTH;
+    SPD -> SPEED;
+
+    NAV_MOD -> PHASE; ILS_MOD -> PHASE; WIND -> PHASE; SYNTH -> PHASE; SPEED -> PHASE;
+    PHASE -> HDG; PHASE -> VS; PHASE -> THR; PHASE -> FLAPS;
+}

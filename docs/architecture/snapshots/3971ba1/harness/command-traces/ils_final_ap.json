@@ -1,0 +1,26 @@
+{
+  "scenario": "ils_final_ap",
+  "phase_before": null,
+  "phase_after": "FINAL",
+  "go_around": false,
+  "stop": false,
+  "exception": null,
+  "entries": [
+    {
+      "index": 1,
+      "command": "FinalPhaseState.handle()",
+      "authorization": "GATEWAY_GUARDED",
+      "backend": "approach_phases.py",
+      "args": {},
+      "result": "called"
+    },
+    {
+      "index": 2,
+      "command": "control.set_heading_hold()",
+      "authorization": "GATEWAY_GUARDED",
+      "backend": "control.py",
+      "args": {},
+      "result": "command sent via gateway"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+﻿flowchart LR
+    subgraph Source["SimConnect Source"]
+        SIM["SimConnect get_all_data()"]
+    end
+    subgraph Telemetry["Telemetry Dict"]
+        POS["position: lat/lon/alt_agl/rh"]
+        SPD["speed: ias/gs/vs"]
+        ATT["attitude: heading/bank/pitch"]
+        NAV["nav: nav1_freq/dme/cdi"]
+        ILS["ils: loc/gs/dev"]
+    end
+    subgraph Calc["Calculation Modules"]
+        NAV_MOD["navigation.py"]
+        ILS_MOD["ils_navigation.py"]
+        WIND["wind_correction.py"]
+        SYNTH["synthetic_glidepath.py"]
+        SPEED["approach_speed_calculator.py"]
+    end
+    subgraph Phase["Phase Logic"]
+        PHASE["approach_phases.py"]
+    end
+    subgraph Output["Actuator Commands"]
+        HDG["heading"]
+        VS["vertical_speed"]
+        THR["throttle"]
+        FLAPS["flaps/gear"]
+    end
+    SIM --> POS
+    SIM --> SPD
+    SIM --> ATT
+    SIM --> NAV
+    SIM --> ILS
+    POS --> NAV_MOD
+    SPD --> NAV_MOD
+    ATT --> NAV_MOD
+    POS --> ILS_MOD
+    SPD --> ILS_MOD
+    ILS --> ILS_MOD
+    POS --> WIND
+    SPD --> WIND
+    ATT --> WIND
+    POS --> SYNTH
+    SPD --> SYNTH
+    SPD --> SPEED
+    NAV_MOD --> PHASE
+    ILS_MOD --> PHASE
+    WIND --> PHASE
+    SYNTH --> PHASE
+    SPEED --> PHASE
+    PHASE --> HDG
+    PHASE --> VS
+    PHASE --> THR
+    PHASE --> FLAPS

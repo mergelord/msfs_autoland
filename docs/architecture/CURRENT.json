@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0",
+  "snapshot": "docs/architecture/snapshots/3971ba1",
+  "baseline_commit": "3971ba12113d8994665b1c9a172f2dca6c9e3855",
+  "production_digest_algorithm": "sha256-path-null-content-v1",
+  "production_digest": "cbb0fc85563c3a71c40f2a9f240238ed4f2f2c3b2909e854e00770ae640a104d",
+  "status": "CURRENT"
+}

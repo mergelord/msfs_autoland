@@ -1,0 +1,42 @@
+{
+  "scenario": "takeover_failure",
+  "phase_before": null,
+  "phase_after": "IDLE",
+  "go_around": true,
+  "stop": false,
+  "exception": null,
+  "entries": [
+    {
+      "index": 1,
+      "command": "FinalPhaseState.handle()",
+      "authorization": "GATEWAY_GUARDED",
+      "backend": "approach_phases.py:256",
+      "args": {},
+      "result": "called"
+    },
+    {
+      "index": 2,
+      "command": "_perform_takeover()",
+      "authorization": "N/A",
+      "backend": "approach_phases.py:269",
+      "args": {},
+      "result": "takeover attempted"
+    },
+    {
+      "index": 3,
+      "command": "perform_takeover() → failed",
+      "authorization": "N/A",
+      "backend": "approach_phases.py:228",
+      "args": {},
+      "result": "hard_safety"
+    },
+    {
+      "index": 4,
+      "command": "execute_go_around()",
+      "authorization": "SAFETY_SCOPE",
+      "backend": "approach_phases.py:244",
+      "args": {},
+      "result": "go-around triggered"
+    }
+  ]
+}

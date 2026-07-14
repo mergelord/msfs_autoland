@@ -1,0 +1,50 @@
+{
+  "scenario": "stabilized_monitor_goaround",
+  "phase_before": null,
+  "phase_after": "IDLE",
+  "go_around": true,
+  "stop": false,
+  "exception": null,
+  "entries": [
+    {
+      "index": 1,
+      "command": "FinalPhaseState.handle()",
+      "authorization": "GATEWAY_GUARDED",
+      "backend": "approach_phases.py",
+      "args": {},
+      "result": "called"
+    },
+    {
+      "index": 2,
+      "command": "_control_aircraft()",
+      "authorization": "GATEWAY_GUARDED",
+      "backend": "approach_phases.py:290",
+      "args": {},
+      "result": "commands sent"
+    },
+    {
+      "index": 3,
+      "command": "_control_throttle()",
+      "authorization": "GATEWAY_GUARDED",
+      "backend": "approach_phases.py:293",
+      "args": {},
+      "result": "throttle sent"
+    },
+    {
+      "index": 4,
+      "command": "_check_stabilization()",
+      "authorization": "N/A",
+      "backend": "approach_phases.py:561",
+      "args": {},
+      "result": "unstabilized → go-around"
+    },
+    {
+      "index": 5,
+      "command": "execute_go_around()",
+      "authorization": "SAFETY_SCOPE",
+      "backend": "approach_phases.py:578",
+      "args": {},
+      "result": "go-around triggered"
+    }
+  ]
+}

@@ -833,3 +833,65 @@ class TestREM01_NaN_Inf_Integration:
         }
         snap = SafetySnapshot.from_telemetry(telemetry, _make_config())
         assert snap.radio_height == 200.0
+
+
+# --- Finding 2: int(NaN) crash guard ---
+
+def test_vs_nan_does_not_crash_control_aircraft():
+    """Finding 2: NaN corrected_vs must not raise ValueError in _control_aircraft."""
+    from modules.approach_phases import FinalPhaseState
+    from modules.control_ownership import ControlOwner
+    from unittest.mock import MagicMock
+
+    system = MagicMock()
+    system.use_vjoy = False
+    system.synthetic_glidepath = None
+    system.approach_config = MagicMock()
+    system.approach_config.station.type = 'VOR'
+    system.approach_config.decision_height = 200
+    system.approach_config.approach_speed = 120
+
+    state = FinalPhaseState.__new__(FinalPhaseState)
+    state.system = system
+    state._ownership = MagicMock()
+    state._ownership.pitch = ControlOwner.AIRCRAFT_AP
+    state._ownership.roll = ControlOwner.AIRCRAFT_AP
+
+    wind_data = {'corrected_vs': float('nan'), 'corrected_heading': 270,
+                 'headwind': 10, 'crosswind': 5, 'drift_angle': 2.0}
+    telemetry = {'position': {'altitude_agl': 500}, 'speed': {'vertical_speed': -500}}
+
+    state._control_aircraft(telemetry, wind_data)
+    system.control.set_vertical_speed.assert_called_once()
+    call_args = system.control.set_vertical_speed.call_args[0][0]
+    assert call_args == 0, f"Expected 0 fallback, got {call_args}"
+
+
+def test_vs_inf_does_not_crash_control_aircraft():
+    """Finding 2: inf corrected_vs must not raise OverflowError."""
+    from modules.approach_phases import FinalPhaseState
+    from modules.control_ownership import ControlOwner
+    from unittest.mock import MagicMock
+
+    system = MagicMock()
+    system.use_vjoy = False
+    system.synthetic_glidepath = None
+    system.approach_config = MagicMock()
+    system.approach_config.station.type = 'VOR'
+    system.approach_config.decision_height = 200
+    system.approach_config.approach_speed = 120
+
+    state = FinalPhaseState.__new__(FinalPhaseState)
+    state.system = system
+    state._ownership = MagicMock()
+    state._ownership.pitch = ControlOwner.AIRCRAFT_AP
+    state._ownership.roll = ControlOwner.AIRCRAFT_AP
+
+    wind_data = {'corrected_vs': float('inf'), 'corrected_heading': 270,
+                 'headwind': 10, 'crosswind': 5, 'drift_angle': 2.0}
+    telemetry = {'position': {'altitude_agl': 500}, 'speed': {'vertical_speed': -500}}
+
+    state._control_aircraft(telemetry, wind_data)
+    system.control.set_vertical_speed.assert_called_once()
+    call_args = system.control.set_vertical_speed.call_args[0][0]
+    assert call_args == 0

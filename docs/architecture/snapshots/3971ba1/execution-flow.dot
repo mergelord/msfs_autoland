@@ -1,0 +1,68 @@
+digraph execution_flow {
+    rankdir=TB;
+    compound=true;
+    node [shape=box, style=filled, fontname="Arial", fontsize=10];
+
+    subgraph cluster_entry {
+        label="Entry Points"; style=filled; fillcolor="#e3f2fd";
+        CLI [label="CLI: main()\nmain.py:849", fillcolor="#bbdefb"];
+        GUI [label="GUI: main()\ngui.py:2468", fillcolor="#bbdefb"];
+    }
+
+    subgraph cluster_init {
+        label="Initialization"; style=filled; fillcolor="#e8f5e9";
+        CREATE [label="AutoLandSystem()\nmain.py:856", fillcolor="#c8e6c9"];
+        CONNECT [label="system.connect()\nmain.py:121", fillcolor="#c8e6c9"];
+        CONFIG [label="configure_approach()\nmain.py:243", fillcolor="#c8e6c9"];
+        START [label="start_approach()\nmain.py:324", fillcolor="#c8e6c9"];
+    }
+
+    subgraph cluster_loop {
+        label="Main Loop — execute_approach() :544"; style=filled; fillcolor="#fff3e0";
+        TELE [label="telemetry.get_all_data()\n:615", fillcolor="#ffe0b2"];
+        MONITOR [label="connection_monitor.update\n:619", fillcolor="#ffe0b2"];
+        CALC [label="_calculate_approach_data()\n:660", fillcolor="#ffe0b2"];
+        WIND [label="wind_correction.apply()\n:713", fillcolor="#ffe0b2"];
+        GUARD [label="SafetyGuard.evaluate()\n:720-747", fillcolor="#ffcdd2"];
+        PHASE [label="phase_state.handle()\n:800", fillcolor="#ffe0b2"];
+        RECORD [label="telemetry_recorder.write_frame\n:560", fillcolor="#ffe0b2"];
+        SLEEP [label="time.sleep(0.5)\n:571", fillcolor="#ffe0b2"];
+    }
+
+    subgraph cluster_actuators {
+        label="Actuator Backends"; style=filled; fillcolor="#f3e5f5";
+        CTRL [label="control.py\n→ SimConnect", fillcolor="#e1bee7"];
+        VJOY [label="virtual_joystick.py\n→ vJoy", fillcolor="#e1bee7"];
+        ADAPT [label="aircraft_adapter.py\n→ WASM/LVAR", fillcolor="#e1bee7"];
+    }
+
+    subgraph cluster_term {
+        label="Termination"; style=filled; fillcolor="#fce4ec";
+        TOUCH [label="TOUCHDOWN\nradio_height < 3", fillcolor="#f8bbd0"];
+        GOAROUND [label="execute_go_around()\nmain.py:422", fillcolor="#f8bbd0"];
+        STOP [label="stop_approach()", fillcolor="#f8bbd0"];
+        DISCONNECT [label="disconnect()", fillcolor="#f8bbd0"];
+    }
+
+    CLI -> CREATE;
+    GUI -> CREATE;
+    CREATE -> CONNECT;
+    CONNECT -> CONFIG;
+    CONFIG -> START;
+    START -> TELE;
+
+    TELE -> CALC [label="data dict"];
+    CALC -> WIND [label="approach_data"];
+    WIND -> GUARD [label="+ wind_data"];
+    GUARD -> GOAROUND [label="GO_AROUND", color=red, style=dashed];
+    GUARD -> PHASE [label="CONTINUE"];
+    PHASE -> RECORD;
+    RECORD -> SLEEP;
+    SLEEP -> TELE [label="while running", style=dashed];
+
+    GOAROUND -> CTRL [label="commands", color=red];
+    GOAROUND -> VJOY [label="center", color=red];
+    GOAROUND -> STOP;
+    TOUCH -> STOP;
+    STOP -> DISCONNECT;
+}

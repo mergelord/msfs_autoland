@@ -1,0 +1,3522 @@
+{
+  "meta": {
+    "commit": "3971ba12113d8994665b1c9a172f2dca6c9e3855",
+    "node_count": 49,
+    "edge_count_runtime": 57,
+    "edge_count_full": 60,
+    "unique_import_lines": 62,
+    "lazy_edges": 9,
+    "type_checking_edges": 3,
+    "dynamic_imports": 0,
+    "runtime_cycles": 0,
+    "full_cycles": 1
+  },
+  "edges": [
+    {
+      "src": "modules.aileron_compensation",
+      "dst": "modules.aircraft_geometry",
+      "lineno": 8,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.aircraft_adapter",
+      "dst": "modules.aircraft_config_reader",
+      "lineno": 33,
+      "lazy": true,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.aircraft_adapter",
+      "dst": "modules.wasm_interface",
+      "lineno": 42,
+      "lazy": true,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.airports_database",
+      "dst": "modules.ils_navigation",
+      "lineno": 11,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.airports_database",
+      "dst": "modules.types",
+      "lineno": 12,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.approach_dialog",
+      "dst": "modules.airports_database",
+      "lineno": 10,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.approach_dialog",
+      "dst": "modules.ils_navigation",
+      "lineno": 11,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.approach_dialog",
+      "dst": "modules.msfs_airport_reader",
+      "lineno": 12,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.approach_dialog",
+      "dst": "modules.types",
+      "lineno": 13,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.approach_dialog",
+      "dst": "modules.navigraph_parser",
+      "lineno": 259,
+      "lazy": true,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.approach_phases",
+      "dst": "modules.control_ownership",
+      "lineno": 10,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.approach_phases",
+      "dst": "main",
+      "lineno": 13,
+      "lazy": false,
+      "conditional": true,
+      "type_checking": true
+    },
+    {
+      "src": "modules.approach_phases",
+      "dst": "modules.audio_alerts",
+      "lineno": 394,
+      "lazy": true,
+      "conditional": true,
+      "type_checking": false
+    },
+    {
+      "src": "modules.autothrottle",
+      "dst": "modules.base_controller",
+      "lineno": 11,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.autothrottle",
+      "dst": "modules.engine_failure_detector",
+      "lineno": 12,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.command_gateway",
+      "dst": "modules.control_ownership",
+      "lineno": 7,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.flare_controller",
+      "dst": "modules.thresholds_config",
+      "lineno": 10,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.msfs_airport_reader",
+      "dst": "modules.navigraph_parser",
+      "lineno": 9,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.navigation",
+      "dst": "modules.types",
+      "lineno": 9,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.navigraph_parser",
+      "dst": "modules.settings",
+      "lineno": 316,
+      "lazy": true,
+      "conditional": true,
+      "type_checking": false
+    },
+    {
+      "src": "modules.settings_dialog",
+      "dst": "modules.settings",
+      "lineno": 10,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.settings_dialog",
+      "dst": "modules.navigraph_parser",
+      "lineno": 73,
+      "lazy": true,
+      "conditional": true,
+      "type_checking": false
+    },
+    {
+      "src": "modules.settings_dialog",
+      "dst": "modules.navigraph_parser",
+      "lineno": 152,
+      "lazy": true,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.settings_dialog",
+      "dst": "modules.navigraph_parser",
+      "lineno": 174,
+      "lazy": true,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.stabilized_approach",
+      "dst": "modules.thresholds_config",
+      "lineno": 11,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.structured_logger",
+      "dst": "modules.log_database",
+      "lineno": 17,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.synthetic_glidepath",
+      "dst": "modules.navigation",
+      "lineno": 33,
+      "lazy": false,
+      "conditional": true,
+      "type_checking": true
+    },
+    {
+      "src": "modules.synthetic_glidepath",
+      "dst": "modules.types",
+      "lineno": 34,
+      "lazy": false,
+      "conditional": true,
+      "type_checking": true
+    },
+    {
+      "src": "modules.turbulence_detector",
+      "dst": "modules.thresholds_config",
+      "lineno": 13,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.wasm_interface",
+      "dst": "modules.simconnect_client_data",
+      "lineno": 13,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "modules.wind_shear_detector",
+      "dst": "modules.thresholds_config",
+      "lineno": 12,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.aircraft_adapter",
+      "lineno": 11,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.approach_phases",
+      "lineno": 12,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.approach_speed_calculator",
+      "lineno": 13,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.audio_alerts",
+      "lineno": 14,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.autopilot_takeover",
+      "lineno": 15,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.autothrottle",
+      "lineno": 16,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.connection_monitor",
+      "lineno": 18,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.connection_optimizer",
+      "lineno": 19,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.control",
+      "lineno": 20,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.command_gateway",
+      "lineno": 22,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.control_ownership",
+      "lineno": 23,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.dme_navigation",
+      "lineno": 24,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.flare_controller",
+      "lineno": 25,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.fms_reader",
+      "lineno": 26,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.ils_navigation",
+      "lineno": 27,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.navigation",
+      "lineno": 28,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.types",
+      "lineno": 29,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.stabilized_approach",
+      "lineno": 30,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.structured_logger",
+      "lineno": 32,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.telemetry",
+      "lineno": 33,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.turbulence_detector",
+      "lineno": 34,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.virtual_joystick",
+      "lineno": 35,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.synthetic_glidepath",
+      "lineno": 36,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.wind_correction",
+      "lineno": 37,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.wind_shear_detector",
+      "lineno": 38,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.safety_guard",
+      "lineno": 39,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "main",
+      "dst": "modules.telemetry_recorder",
+      "lineno": 40,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "gui",
+      "dst": "main",
+      "lineno": 12,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "gui",
+      "dst": "modules.approach_dialog",
+      "lineno": 13,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "gui",
+      "dst": "modules.wasm_version_checker",
+      "lineno": 14,
+      "lazy": false,
+      "conditional": false,
+      "type_checking": false
+    },
+    {
+      "src": "gui",
+      "dst": "modules.settings_dialog",
+      "lineno": 2443,
+      "lazy": true,
+      "conditional": false,
+      "type_checking": false
+    }
+  ],
+  "nodes": [
+    {
+      "id": "modules.__init__",
+      "fan_in": 0,
+      "fan_out": 0,
+      "layer": [
+        "gui",
+        "modules.rudder_compensation",
+        "modules.log_analyzer",
+        "modules.auto_fixer",
+        "modules.aileron_compensation",
+        "modules.__init__"
+      ]
+    },
+    {
+      "id": "modules.aileron_compensation",
+      "fan_in": 0,
+      "fan_out": 1,
+      "layer": [
+        "gui",
+        "modules.rudder_compensation",
+        "modules.log_analyzer",
+        "modules.auto_fixer",
+        "modules.aileron_compensation",
+        "modules.__init__"
+      ]
+    },
+    {
+      "id": "modules.aircraft_adapter",
+      "fan_in": 1,
+      "fan_out": 2,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.aircraft_config_reader",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.aircraft_geometry",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.airports_database",
+      "fan_in": 1,
+      "fan_out": 2,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.approach_dialog",
+      "fan_in": 1,
+      "fan_out": 5,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.approach_phases",
+      "fan_in": 1,
+      "fan_out": 3,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.approach_speed_calculator",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.audio_alerts",
+      "fan_in": 2,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.auto_fixer",
+      "fan_in": 0,
+      "fan_out": 0,
+      "layer": [
+        "gui",
+        "modules.rudder_compensation",
+        "modules.log_analyzer",
+        "modules.auto_fixer",
+        "modules.aileron_compensation",
+        "modules.__init__"
+      ]
+    },
+    {
+      "id": "modules.autopilot_takeover",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.autothrottle",
+      "fan_in": 1,
+      "fan_out": 2,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.base_controller",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.command_gateway",
+      "fan_in": 1,
+      "fan_out": 1,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.connection_monitor",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.connection_optimizer",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.control",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.control_ownership",
+      "fan_in": 3,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.dme_navigation",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.engine_failure_detector",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.flare_controller",
+      "fan_in": 1,
+      "fan_out": 1,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.fms_reader",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.ils_navigation",
+      "fan_in": 3,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.log_analyzer",
+      "fan_in": 0,
+      "fan_out": 0,
+      "layer": [
+        "gui",
+        "modules.rudder_compensation",
+        "modules.log_analyzer",
+        "modules.auto_fixer",
+        "modules.aileron_compensation",
+        "modules.__init__"
+      ]
+    },
+    {
+      "id": "modules.log_database",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.msfs_airport_reader",
+      "fan_in": 1,
+      "fan_out": 1,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.navigation",
+      "fan_in": 2,
+      "fan_out": 1,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.navigraph_parser",
+      "fan_in": 3,
+      "fan_out": 1,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.rudder_compensation",
+      "fan_in": 0,
+      "fan_out": 0,
+      "layer": [
+        "gui",
+        "modules.rudder_compensation",
+        "modules.log_analyzer",
+        "modules.auto_fixer",
+        "modules.aileron_compensation",
+        "modules.__init__"
+      ]
+    },
+    {
+      "id": "modules.safety_guard",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.settings",
+      "fan_in": 2,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.settings_dialog",
+      "fan_in": 1,
+      "fan_out": 2,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.simconnect_client_data",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.stabilized_approach",
+      "fan_in": 1,
+      "fan_out": 1,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.structured_logger",
+      "fan_in": 1,
+      "fan_out": 1,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.synthetic_glidepath",
+      "fan_in": 1,
+      "fan_out": 2,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.telemetry",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.telemetry_recorder",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.thresholds_config",
+      "fan_in": 4,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.turbulence_detector",
+      "fan_in": 1,
+      "fan_out": 1,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.types",
+      "fan_in": 5,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.virtual_joystick",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.wasm_interface",
+      "fan_in": 1,
+      "fan_out": 1,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.wasm_version_checker",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.wind_correction",
+      "fan_in": 1,
+      "fan_out": 0,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "modules.wind_shear_detector",
+      "fan_in": 1,
+      "fan_out": 1,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "main",
+      "fan_in": 2,
+      "fan_out": 27,
+      "layer": [
+        "modules.settings",
+        "modules.simconnect_client_data",
+        "modules.navigraph_parser",
+        "modules.types",
+        "modules.ils_navigation",
+        "modules.thresholds_config",
+        "modules.log_database",
+        "modules.control_ownership",
+        "modules.engine_failure_detector",
+        "modules.base_controller",
+        "modules.audio_alerts",
+        "modules.wasm_interface",
+        "modules.aircraft_config_reader",
+        "modules.msfs_airport_reader",
+        "modules.airports_database",
+        "modules.telemetry_recorder",
+        "modules.safety_guard",
+        "modules.wind_shear_detector",
+        "modules.wind_correction",
+        "modules.synthetic_glidepath",
+        "modules.virtual_joystick",
+        "modules.turbulence_detector",
+        "modules.telemetry",
+        "modules.structured_logger",
+        "modules.stabilized_approach",
+        "modules.navigation",
+        "modules.fms_reader",
+        "modules.flare_controller",
+        "modules.dme_navigation",
+        "modules.command_gateway",
+        "modules.control",
+        "modules.connection_optimizer",
+        "modules.connection_monitor",
+        "modules.autothrottle",
+        "modules.autopilot_takeover",
+        "modules.approach_speed_calculator",
+        "modules.approach_phases",
+        "modules.aircraft_adapter",
+        "modules.settings_dialog",
+        "modules.wasm_version_checker",
+        "modules.approach_dialog",
+        "main",
+        "modules.aircraft_geometry"
+      ]
+    },
+    {
+      "id": "gui",
+      "fan_in": 0,
+      "fan_out": 4,
+      "layer": [
+        "gui",
+        "modules.rudder_compensation",
+        "modules.log_analyzer",
+        "modules.auto_fixer",
+        "modules.aileron_compensation",
+        "modules.__init__"
+      ]
+    }
+  ],
+  "graph_runtime": {
+    "directed": true,
+    "multigraph": false,
+    "graph": {},
+    "nodes": [
+      {
+        "id": "modules.__init__"
+      },
+      {
+        "id": "modules.aileron_compensation"
+      },
+      {
+        "id": "modules.aircraft_adapter"
+      },
+      {
+        "id": "modules.aircraft_config_reader"
+      },
+      {
+        "id": "modules.aircraft_geometry"
+      },
+      {
+        "id": "modules.airports_database"
+      },
+      {
+        "id": "modules.approach_dialog"
+      },
+      {
+        "id": "modules.approach_phases"
+      },
+      {
+        "id": "modules.approach_speed_calculator"
+      },
+      {
+        "id": "modules.audio_alerts"
+      },
+      {
+        "id": "modules.auto_fixer"
+      },
+      {
+        "id": "modules.autopilot_takeover"
+      },
+      {
+        "id": "modules.autothrottle"
+      },
+      {
+        "id": "modules.base_controller"
+      },
+      {
+        "id": "modules.command_gateway"
+      },
+      {
+        "id": "modules.connection_monitor"
+      },
+      {
+        "id": "modules.connection_optimizer"
+      },
+      {
+        "id": "modules.control"
+      },
+      {
+        "id": "modules.control_ownership"
+      },
+      {
+        "id": "modules.dme_navigation"
+      },
+      {
+        "id": "modules.engine_failure_detector"
+      },
+      {
+        "id": "modules.flare_controller"
+      },
+      {
+        "id": "modules.fms_reader"
+      },
+      {
+        "id": "modules.ils_navigation"
+      },
+      {
+        "id": "modules.log_analyzer"
+      },
+      {
+        "id": "modules.log_database"
+      },
+      {
+        "id": "modules.msfs_airport_reader"
+      },
+      {
+        "id": "modules.navigation"
+      },
+      {
+        "id": "modules.navigraph_parser"
+      },
+      {
+        "id": "modules.rudder_compensation"
+      },
+      {
+        "id": "modules.safety_guard"
+      },
+      {
+        "id": "modules.settings"
+      },
+      {
+        "id": "modules.settings_dialog"
+      },
+      {
+        "id": "modules.simconnect_client_data"
+      },
+      {
+        "id": "modules.stabilized_approach"
+      },
+      {
+        "id": "modules.structured_logger"
+      },
+      {
+        "id": "modules.synthetic_glidepath"
+      },
+      {
+        "id": "modules.telemetry"
+      },
+      {
+        "id": "modules.telemetry_recorder"
+      },
+      {
+        "id": "modules.thresholds_config"
+      },
+      {
+        "id": "modules.turbulence_detector"
+      },
+      {
+        "id": "modules.types"
+      },
+      {
+        "id": "modules.virtual_joystick"
+      },
+      {
+        "id": "modules.wasm_interface"
+      },
+      {
+        "id": "modules.wasm_version_checker"
+      },
+      {
+        "id": "modules.wind_correction"
+      },
+      {
+        "id": "modules.wind_shear_detector"
+      },
+      {
+        "id": "main"
+      },
+      {
+        "id": "gui"
+      }
+    ],
+    "edges": [
+      {
+        "source": "modules.aileron_compensation",
+        "target": "modules.aircraft_geometry"
+      },
+      {
+        "source": "modules.aircraft_adapter",
+        "target": "modules.aircraft_config_reader"
+      },
+      {
+        "source": "modules.aircraft_adapter",
+        "target": "modules.wasm_interface"
+      },
+      {
+        "source": "modules.airports_database",
+        "target": "modules.ils_navigation"
+      },
+      {
+        "source": "modules.airports_database",
+        "target": "modules.types"
+      },
+      {
+        "source": "modules.approach_dialog",
+        "target": "modules.airports_database"
+      },
+      {
+        "source": "modules.approach_dialog",
+        "target": "modules.ils_navigation"
+      },
+      {
+        "source": "modules.approach_dialog",
+        "target": "modules.msfs_airport_reader"
+      },
+      {
+        "source": "modules.approach_dialog",
+        "target": "modules.types"
+      },
+      {
+        "source": "modules.approach_dialog",
+        "target": "modules.navigraph_parser"
+      },
+      {
+        "source": "modules.approach_phases",
+        "target": "modules.control_ownership"
+      },
+      {
+        "source": "modules.approach_phases",
+        "target": "modules.audio_alerts"
+      },
+      {
+        "source": "modules.autothrottle",
+        "target": "modules.base_controller"
+      },
+      {
+        "source": "modules.autothrottle",
+        "target": "modules.engine_failure_detector"
+      },
+      {
+        "source": "modules.command_gateway",
+        "target": "modules.control_ownership"
+      },
+      {
+        "source": "modules.flare_controller",
+        "target": "modules.thresholds_config"
+      },
+      {
+        "source": "modules.msfs_airport_reader",
+        "target": "modules.navigraph_parser"
+      },
+      {
+        "source": "modules.navigation",
+        "target": "modules.types"
+      },
+      {
+        "source": "modules.navigraph_parser",
+        "target": "modules.settings"
+      },
+      {
+        "source": "modules.settings_dialog",
+        "target": "modules.settings"
+      },
+      {
+        "source": "modules.settings_dialog",
+        "target": "modules.navigraph_parser"
+      },
+      {
+        "source": "modules.stabilized_approach",
+        "target": "modules.thresholds_config"
+      },
+      {
+        "source": "modules.structured_logger",
+        "target": "modules.log_database"
+      },
+      {
+        "source": "modules.turbulence_detector",
+        "target": "modules.thresholds_config"
+      },
+      {
+        "source": "modules.wasm_interface",
+        "target": "modules.simconnect_client_data"
+      },
+      {
+        "source": "modules.wind_shear_detector",
+        "target": "modules.thresholds_config"
+      },
+      {
+        "source": "main",
+        "target": "modules.aircraft_adapter"
+      },
+      {
+        "source": "main",
+        "target": "modules.approach_phases"
+      },
+      {
+        "source": "main",
+        "target": "modules.approach_speed_calculator"
+      },
+      {
+        "source": "main",
+        "target": "modules.audio_alerts"
+      },
+      {
+        "source": "main",
+        "target": "modules.autopilot_takeover"
+      },
+      {
+        "source": "main",
+        "target": "modules.autothrottle"
+      },
+      {
+        "source": "main",
+        "target": "modules.connection_monitor"
+      },
+      {
+        "source": "main",
+        "target": "modules.connection_optimizer"
+      },
+      {
+        "source": "main",
+        "target": "modules.control"
+      },
+      {
+        "source": "main",
+        "target": "modules.command_gateway"
+      },
+      {
+        "source": "main",
+        "target": "modules.control_ownership"
+      },
+      {
+        "source": "main",
+        "target": "modules.dme_navigation"
+      },
+      {
+        "source": "main",
+        "target": "modules.flare_controller"
+      },
+      {
+        "source": "main",
+        "target": "modules.fms_reader"
+      },
+      {
+        "source": "main",
+        "target": "modules.ils_navigation"
+      },
+      {
+        "source": "main",
+        "target": "modules.navigation"
+      },
+      {
+        "source": "main",
+        "target": "modules.types"
+      },
+      {
+        "source": "main",
+        "target": "modules.stabilized_approach"
+      },
+      {
+        "source": "main",
+        "target": "modules.structured_logger"
+      },
+      {
+        "source": "main",
+        "target": "modules.telemetry"
+      },
+      {
+        "source": "main",
+        "target": "modules.turbulence_detector"
+      },
+      {
+        "source": "main",
+        "target": "modules.virtual_joystick"
+      },
+      {
+        "source": "main",
+        "target": "modules.synthetic_glidepath"
+      },
+      {
+        "source": "main",
+        "target": "modules.wind_correction"
+      },
+      {
+        "source": "main",
+        "target": "modules.wind_shear_detector"
+      },
+      {
+        "source": "main",
+        "target": "modules.safety_guard"
+      },
+      {
+        "source": "main",
+        "target": "modules.telemetry_recorder"
+      },
+      {
+        "source": "gui",
+        "target": "main"
+      },
+      {
+        "source": "gui",
+        "target": "modules.approach_dialog"
+      },
+      {
+        "source": "gui",
+        "target": "modules.wasm_version_checker"
+      },
+      {
+        "source": "gui",
+        "target": "modules.settings_dialog"
+      }
+    ]
+  },
+  "graph_full": {
+    "directed": true,
+    "multigraph": false,
+    "graph": {},
+    "nodes": [
+      {
+        "id": "modules.__init__"
+      },
+      {
+        "id": "modules.aileron_compensation"
+      },
+      {
+        "id": "modules.aircraft_adapter"
+      },
+      {
+        "id": "modules.aircraft_config_reader"
+      },
+      {
+        "id": "modules.aircraft_geometry"
+      },
+      {
+        "id": "modules.airports_database"
+      },
+      {
+        "id": "modules.approach_dialog"
+      },
+      {
+        "id": "modules.approach_phases"
+      },
+      {
+        "id": "modules.approach_speed_calculator"
+      },
+      {
+        "id": "modules.audio_alerts"
+      },
+      {
+        "id": "modules.auto_fixer"
+      },
+      {
+        "id": "modules.autopilot_takeover"
+      },
+      {
+        "id": "modules.autothrottle"
+      },
+      {
+        "id": "modules.base_controller"
+      },
+      {
+        "id": "modules.command_gateway"
+      },
+      {
+        "id": "modules.connection_monitor"
+      },
+      {
+        "id": "modules.connection_optimizer"
+      },
+      {
+        "id": "modules.control"
+      },
+      {
+        "id": "modules.control_ownership"
+      },
+      {
+        "id": "modules.dme_navigation"
+      },
+      {
+        "id": "modules.engine_failure_detector"
+      },
+      {
+        "id": "modules.flare_controller"
+      },
+      {
+        "id": "modules.fms_reader"
+      },
+      {
+        "id": "modules.ils_navigation"
+      },
+      {
+        "id": "modules.log_analyzer"
+      },
+      {
+        "id": "modules.log_database"
+      },
+      {
+        "id": "modules.msfs_airport_reader"
+      },
+      {
+        "id": "modules.navigation"
+      },
+      {
+        "id": "modules.navigraph_parser"
+      },
+      {
+        "id": "modules.rudder_compensation"
+      },
+      {
+        "id": "modules.safety_guard"
+      },
+      {
+        "id": "modules.settings"
+      },
+      {
+        "id": "modules.settings_dialog"
+      },
+      {
+        "id": "modules.simconnect_client_data"
+      },
+      {
+        "id": "modules.stabilized_approach"
+      },
+      {
+        "id": "modules.structured_logger"
+      },
+      {
+        "id": "modules.synthetic_glidepath"
+      },
+      {
+        "id": "modules.telemetry"
+      },
+      {
+        "id": "modules.telemetry_recorder"
+      },
+      {
+        "id": "modules.thresholds_config"
+      },
+      {
+        "id": "modules.turbulence_detector"
+      },
+      {
+        "id": "modules.types"
+      },
+      {
+        "id": "modules.virtual_joystick"
+      },
+      {
+        "id": "modules.wasm_interface"
+      },
+      {
+        "id": "modules.wasm_version_checker"
+      },
+      {
+        "id": "modules.wind_correction"
+      },
+      {
+        "id": "modules.wind_shear_detector"
+      },
+      {
+        "id": "main"
+      },
+      {
+        "id": "gui"
+      }
+    ],
+    "edges": [
+      {
+        "source": "modules.aileron_compensation",
+        "target": "modules.aircraft_geometry"
+      },
+      {
+        "source": "modules.aircraft_adapter",
+        "target": "modules.aircraft_config_reader"
+      },
+      {
+        "source": "modules.aircraft_adapter",
+        "target": "modules.wasm_interface"
+      },
+      {
+        "source": "modules.airports_database",
+        "target": "modules.ils_navigation"
+      },
+      {
+        "source": "modules.airports_database",
+        "target": "modules.types"
+      },
+      {
+        "source": "modules.approach_dialog",
+        "target": "modules.airports_database"
+      },
+      {
+        "source": "modules.approach_dialog",
+        "target": "modules.ils_navigation"
+      },
+      {
+        "source": "modules.approach_dialog",
+        "target": "modules.msfs_airport_reader"
+      },
+      {
+        "source": "modules.approach_dialog",
+        "target": "modules.types"
+      },
+      {
+        "source": "modules.approach_dialog",
+        "target": "modules.navigraph_parser"
+      },
+      {
+        "source": "modules.approach_phases",
+        "target": "modules.control_ownership"
+      },
+      {
+        "source": "modules.approach_phases",
+        "target": "main"
+      },
+      {
+        "source": "modules.approach_phases",
+        "target": "modules.audio_alerts"
+      },
+      {
+        "source": "modules.autothrottle",
+        "target": "modules.base_controller"
+      },
+      {
+        "source": "modules.autothrottle",
+        "target": "modules.engine_failure_detector"
+      },
+      {
+        "source": "modules.command_gateway",
+        "target": "modules.control_ownership"
+      },
+      {
+        "source": "modules.flare_controller",
+        "target": "modules.thresholds_config"
+      },
+      {
+        "source": "modules.msfs_airport_reader",
+        "target": "modules.navigraph_parser"
+      },
+      {
+        "source": "modules.navigation",
+        "target": "modules.types"
+      },
+      {
+        "source": "modules.navigraph_parser",
+        "target": "modules.settings"
+      },
+      {
+        "source": "modules.settings_dialog",
+        "target": "modules.settings"
+      },
+      {
+        "source": "modules.settings_dialog",
+        "target": "modules.navigraph_parser"
+      },
+      {
+        "source": "modules.stabilized_approach",
+        "target": "modules.thresholds_config"
+      },
+      {
+        "source": "modules.structured_logger",
+        "target": "modules.log_database"
+      },
+      {
+        "source": "modules.synthetic_glidepath",
+        "target": "modules.navigation"
+      },
+      {
+        "source": "modules.synthetic_glidepath",
+        "target": "modules.types"
+      },
+      {
+        "source": "modules.turbulence_detector",
+        "target": "modules.thresholds_config"
+      },
+      {
+        "source": "modules.wasm_interface",
+        "target": "modules.simconnect_client_data"
+      },
+      {
+        "source": "modules.wind_shear_detector",
+        "target": "modules.thresholds_config"
+      },
+      {
+        "source": "main",
+        "target": "modules.aircraft_adapter"
+      },
+      {
+        "source": "main",
+        "target": "modules.approach_phases"
+      },
+      {
+        "source": "main",
+        "target": "modules.approach_speed_calculator"
+      },
+      {
+        "source": "main",
+        "target": "modules.audio_alerts"
+      },
+      {
+        "source": "main",
+        "target": "modules.autopilot_takeover"
+      },
+      {
+        "source": "main",
+        "target": "modules.autothrottle"
+      },
+      {
+        "source": "main",
+        "target": "modules.connection_monitor"
+      },
+      {
+        "source": "main",
+        "target": "modules.connection_optimizer"
+      },
+      {
+        "source": "main",
+        "target": "modules.control"
+      },
+      {
+        "source": "main",
+        "target": "modules.command_gateway"
+      },
+      {
+        "source": "main",
+        "target": "modules.control_ownership"
+      },
+      {
+        "source": "main",
+        "target": "modules.dme_navigation"
+      },
+      {
+        "source": "main",
+        "target": "modules.flare_controller"
+      },
+      {
+        "source": "main",
+        "target": "modules.fms_reader"
+      },
+      {
+        "source": "main",
+        "target": "modules.ils_navigation"
+      },
+      {
+        "source": "main",
+        "target": "modules.navigation"
+      },
+      {
+        "source": "main",
+        "target": "modules.types"
+      },
+      {
+        "source": "main",
+        "target": "modules.stabilized_approach"
+      },
+      {
+        "source": "main",
+        "target": "modules.structured_logger"
+      },
+      {
+        "source": "main",
+        "target": "modules.telemetry"
+      },
+      {
+        "source": "main",
+        "target": "modules.turbulence_detector"
+      },
+      {
+        "source": "main",
+        "target": "modules.virtual_joystick"
+      },
+      {
+        "source": "main",
+        "target": "modules.synthetic_glidepath"
+      },
+      {
+        "source": "main",
+        "target": "modules.wind_correction"
+      },
+      {
+        "source": "main",
+        "target": "modules.wind_shear_detector"
+      },
+      {
+        "source": "main",
+        "target": "modules.safety_guard"
+      },
+      {
+        "source": "main",
+        "target": "modules.telemetry_recorder"
+      },
+      {
+        "source": "gui",
+        "target": "main"
+      },
+      {
+        "source": "gui",
+        "target": "modules.approach_dialog"
+      },
+      {
+        "source": "gui",
+        "target": "modules.wasm_version_checker"
+      },
+      {
+        "source": "gui",
+        "target": "modules.settings_dialog"
+      }
+    ]
+  }
+}

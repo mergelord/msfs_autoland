@@ -1,0 +1,41 @@
+digraph safety_flow {
+    rankdir=TB;
+    node [shape=box, style=filled, fontname="Arial", fontsize=9];
+
+    subgraph cluster_pre {
+        label="Pre-Command Protection"; style=filled; fillcolor="#e8f5e9";
+        GUARD [label="SafetyGuard.evaluate()\nmain.py:720", fillcolor="#c8e6c9"];
+        SNAPSHOT [label="SafetySnapshot.from_telemetry()\nmain.py:721", fillcolor="#c8e6c9"];
+    }
+
+    subgraph cluster_in_phase {
+        label="In-Phase Detection"; style=filled; fillcolor="#fff3e0";
+        STAB [label="StabilizedApproachMonitor\napproach_phases.py:561", fillcolor="#ffe0b2"];
+        WIND_S [label="WindShearDetector\napproach_phases.py:386", fillcolor="#ffe0b2"];
+        TURB [label="TurbulenceDetector\napproach_phases.py:398", fillcolor="#ffe0b2"];
+        DH [label="DH Guard\napproach_phases.py:303", fillcolor="#ffe0b2"];
+    }
+
+    subgraph cluster_connection {
+        label="Connection Monitoring"; style=filled; fillcolor="#e3f2fd";
+        CONN [label="ConnectionMonitor\nmain.py:618", fillcolor="#bbdefb"];
+        ERROR [label="Error Budget\nmain.py:598", fillcolor="#bbdefb"];
+    }
+
+    subgraph cluster_action {
+        label="Actions"; style=filled; fillcolor="#fce4ec";
+        GOAROUND [label="execute_go_around()\nmain.py:422", fillcolor="#f8bbd0"];
+        STOP [label="stop_approach()\nmain.py:606", fillcolor="#f8bbd0"];
+        HOLD [label="Hold last command", fillcolor="#f8bbd0"];
+    }
+
+    SNAPSHOT -> GUARD;
+    GUARD -> GOAROUND [label="GO_AROUND", color=red, style=dashed];
+    STAB -> GOAROUND [label="should_go_around()", color=red, style=dashed];
+    WIND_S -> GOAROUND [label="wind shear alert", color=red, style=dashed];
+    TURB -> GOAROUND [label="turbulence alert", color=red, style=dashed];
+    DH -> GOAROUND [label="below DH no takeover", color=red, style=dashed];
+    CONN -> ERROR;
+    ERROR -> GOAROUND [label="max errors + post-takeover", color=red, style=dashed];
+    ERROR -> STOP [label="max errors + pre-takeover"];
+}

@@ -1,0 +1,74 @@
+{
+  "scenario": "missing_telemetry",
+  "phase_before": null,
+  "phase_after": "IDLE",
+  "go_around": false,
+  "stop": true,
+  "exception": null,
+  "entries": [
+    {
+      "index": 1,
+      "command": "execute_approach()",
+      "authorization": "N/A",
+      "backend": "main.py:544",
+      "args": {},
+      "result": "loop started"
+    },
+    {
+      "index": 2,
+      "command": "get_all_data() → exception",
+      "authorization": "N/A",
+      "backend": "main.py:615",
+      "args": {},
+      "result": "ConnectionError"
+    },
+    {
+      "index": 3,
+      "command": "consecutive_errors=1",
+      "authorization": "N/A",
+      "backend": "main.py:579",
+      "args": {},
+      "result": "error counted"
+    },
+    {
+      "index": 4,
+      "command": "get_all_data() → exception",
+      "authorization": "N/A",
+      "backend": "main.py:615",
+      "args": {},
+      "result": "ConnectionError"
+    },
+    {
+      "index": 5,
+      "command": "consecutive_errors=2",
+      "authorization": "N/A",
+      "backend": "main.py:579",
+      "args": {},
+      "result": "error counted"
+    },
+    {
+      "index": 6,
+      "command": "get_all_data() → exception",
+      "authorization": "N/A",
+      "backend": "main.py:615",
+      "args": {},
+      "result": "ConnectionError"
+    },
+    {
+      "index": 7,
+      "command": "consecutive_errors=3 ≥ max",
+      "authorization": "N/A",
+      "backend": "main.py:598",
+      "args": {},
+      "result": "budget exceeded"
+    },
+    {
+      "index": 8,
+      "command": "stop_approach()",
+      "authorization": "N/A",
+      "backend": "main.py:606",
+      "args": {},
+      "result": "pre-takeover stop"
+    }
+  ]
+}

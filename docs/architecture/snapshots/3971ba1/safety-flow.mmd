@@ -1,0 +1,28 @@
+﻿flowchart TB
+    subgraph Pre["Pre-Command Protection"]
+        GUARD["SafetyGuard.evaluate() main.py:720"]
+        SNAPSHOT["SafetySnapshot main.py:721"]
+    end
+    subgraph InPhase["In-Phase Detection"]
+        STAB["StabilizedApproachMonitor approach_phases.py:561"]
+        WIND_S["WindShearDetector approach_phases.py:386"]
+        TURB["TurbulenceDetector approach_phases.py:398"]
+        DH["DH Guard approach_phases.py:303"]
+    end
+    subgraph Conn["Connection Monitoring"]
+        CONN["ConnectionMonitor main.py:618"]
+        ERROR["Error Budget main.py:598"]
+    end
+    subgraph Action["Actions"]
+        GOAROUND["execute_go_around() main.py:422"]
+        STOP["stop_approach() main.py:606"]
+    end
+    SNAPSHOT --> GUARD
+    GUARD -->|"GO_AROUND"| GOAROUND
+    STAB -->|"should_go_around()"| GOAROUND
+    WIND_S -->|"wind shear alert"| GOAROUND
+    TURB -->|"turbulence alert"| GOAROUND
+    DH -->|"below DH no takeover"| GOAROUND
+    CONN --> ERROR
+    ERROR -->|"max errors + post-takeover"| GOAROUND
+    ERROR -->|"max errors + pre-takeover"| STOP

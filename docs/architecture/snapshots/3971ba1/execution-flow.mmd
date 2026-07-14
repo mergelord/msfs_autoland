@@ -1,0 +1,90 @@
+flowchart TD
+    subgraph Entry["Entry Points"]
+        CLI["CLI: main()\nmain.py:849"]
+        GUI["GUI: main()\n gui.py:2468"]
+    end
+
+    subgraph Init["Initialization"]
+        CREATE["AutoLandSystem()\nmain.py:856"]
+        CONNECT["system.connect()\nmain.py:121"]
+        CONFIG["configure_approach()\nmain.py:243"]
+        START["start_approach()\nmain.py:324"]
+    end
+
+    subgraph MainLoop["Main Loop — execute_approach() :544"]
+        TELE["telemetry.get_all_data()\n:615"]
+        MONITOR["connection_monitor.update\n:619"]
+        CALC["_calculate_approach_data()\n:660"]
+        WIND["wind_correction.apply\n:713"]
+        GUARD["SafetyGuard.evaluate()\n:720-747"]
+        PHASE["phase_state.handle()\n:800"]
+        RECORD["telemetry_recorder.write_frame\n:560"]
+        SLEEP["time.sleep(0.5)\n:571"]
+    end
+
+    subgraph PhaseDispatch["Phase Dispatch"]
+        INIT_S["InitialPhaseState.handle()"]
+        INT_S["IntermediatePhaseState.handle()"]
+        FINAL_S["FinalPhaseState.handle()"]
+        LAND_S["LandingPhaseState.handle()"]
+    end
+
+    subgraph Actuators["Actuator Commands"]
+        CTRL["control.py → SimConnect"]
+        VJOY["virtual_joystick.py → vJoy"]
+        ADAPT["aircraft_adapter.py → WASM/LVAR"]
+    end
+
+    subgraph Termination["Termination"]
+        TOUCH["TOUCHDOWN radio_height<3"]
+        GOAROUND["execute_go_around()\nmain.py:422"]
+        STOP["stop_approach()"]
+        DISCONNECT["disconnect()"]
+    end
+
+    CLI --> CREATE
+    GUI --> CREATE
+    CREATE --> CONNECT
+    CONNECT --> CONFIG
+    CONFIG --> START
+    START --> TELE
+
+    TELE --> CALC
+    CALC --> WIND
+    WIND --> GUARD
+    GUARD -->|"GO_AROUND"| GOAROUND
+    GUARD -->|"CONTINUE"| PHASE
+    PHASE --> RECORD
+    RECORD --> SLEEP
+    SLEEP -->|"while running"| TELE
+
+    PHASE --> INIT_S
+    PHASE --> INT_S
+    PHASE --> FINAL_S
+    PHASE --> LAND_S
+
+    INIT_S --> CTRL
+    INT_S --> CTRL
+    FINAL_S --> CTRL
+    FINAL_S --> VJOY
+    FINAL_S --> ADAPT
+    LAND_S --> VJOY
+
+    GOAROUND --> CTRL
+    GOAROUND --> VJOY
+    GOAROUND --> STOP
+
+    TOUCH --> STOP
+    STOP --> DISCONNECT
+
+    classDef entry fill:#e3f2fd,stroke:#1976d2
+    classDef loop fill:#e8f5e9,stroke:#388e3c
+    classDef phase fill:#fff3e0,stroke:#f57c00
+    classDef actuator fill:#f3e5f5,stroke:#7b1fa2
+    classDef term fill:#fce4ec,stroke:#c62828
+
+    class CLI,GUI entry
+    class TELE,MONITOR,CALC,WIND,GUARD,PHASE,RECORD,SLEEP loop
+    class INIT_S,INT_S,FINAL_S,LAND_S phase
+    class CTRL,VJOY,ADAPT actuator
+    class TOUCH,GOAROUND,STOP,DISCONNECT term

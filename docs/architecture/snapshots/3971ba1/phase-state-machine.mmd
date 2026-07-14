@@ -1,0 +1,33 @@
+flowchart TD
+    IDLE["IDLE\n(main.py:98)"]
+    INITIAL["INITIAL\n(InitialPhaseState)"]
+    INTERMEDIATE["INTERMEDIATE\n(IntermediatePhaseState)"]
+    FINAL["FINAL\n(FinalPhaseState)"]
+    LANDING["LANDING\n(LandingPhaseState)"]
+    COMPLETED["COMPLETED\n(main.py:820)"]
+
+    IDLE -->|"start_approach()"| INITIAL
+    INITIAL -->|"on_course AND dme<15"| INTERMEDIATE
+    INTERMEDIATE -->|"ILS: on_localizer\nnon-ILS: takeover done\n+ dist<8 + alt match"| FINAL
+    FINAL -->|"radio_height < DH\n+ takeover confirmed\n+ stabilized"| LANDING
+    LANDING -->|"radio_height < 3ft"| COMPLETED
+
+    %% Go-around paths
+    INTERMEDIATE -.->|"takeover fail\n(channels:313,373)"| IDLE
+    FINAL -.->|"SafetyGuard GO_AROUND\n(channels:746)"| IDLE
+    FINAL -.->|"stabilization fail\n(channels:578,618)"| IDLE
+    FINAL -.->|"wind shear/turbulence\n(channels:408)"| IDLE
+    FINAL -.->|"DH guard: below DH\nwithout takeover\n(channels:313)"| IDLE
+    FINAL -.->|"error budget exceeded\n(channels:604)"| IDLE
+
+    %% Styling
+    classDef idle fill:#f5f5f5,stroke:#999
+    classDef active fill:#e8f5e9,stroke:#4caf50
+    classDef landing fill:#fff3e0,stroke:#ff9800
+    classDef completed fill:#e3f2fd,stroke:#2196f3
+    classDef goaround fill:#fce4ec,stroke:#e91e63,stroke-dasharray: 5 5
+
+    class IDLE idle
+    class INITIAL,INTERMEDIATE,FINAL active
+    class LANDING landing
+    class COMPLETED completed

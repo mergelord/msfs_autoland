@@ -1,0 +1,34 @@
+{
+  "scenario": "takeover_initiation",
+  "phase_before": null,
+  "phase_after": null,
+  "go_around": false,
+  "stop": false,
+  "exception": null,
+  "entries": [
+    {
+      "index": 1,
+      "command": "IntermediatePhaseState.handle()",
+      "authorization": "GATEWAY_GUARDED",
+      "backend": "approach_phases.py:86",
+      "args": {},
+      "result": "called"
+    },
+    {
+      "index": 2,
+      "command": "should_initiate_takeover()",
+      "authorization": "N/A",
+      "backend": "approach_phases.py:187",
+      "args": {},
+      "result": "True"
+    },
+    {
+      "index": 3,
+      "command": "perform_takeover()",
+      "authorization": "N/A",
+      "backend": "approach_phases.py:228",
+      "args": {},
+      "result": "completed=True"
+    }
+  ]
+}

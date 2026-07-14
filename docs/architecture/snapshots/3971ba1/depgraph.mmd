@@ -1,0 +1,114 @@
+flowchart TD
+  subgraph L0
+    modules_settings["modules.settings"]
+    modules_simconnect_client_data["modules.simconnect_client_data"]
+    modules_navigraph_parser["modules.navigraph_parser"]
+    modules_types["modules.types"]
+    modules_ils_navigation["modules.ils_navigation"]
+    modules_thresholds_config["modules.thresholds_config"]
+    modules_log_database["modules.log_database"]
+    modules_control_ownership["modules.control_ownership"]
+    modules_engine_failure_detector["modules.engine_failure_detector"]
+    modules_base_controller["modules.base_controller"]
+    modules_audio_alerts["modules.audio_alerts"]
+    modules_wasm_interface["modules.wasm_interface"]
+    modules_aircraft_config_reader["modules.aircraft_config_reader"]
+    modules_msfs_airport_reader["modules.msfs_airport_reader"]
+    modules_airports_database["modules.airports_database"]
+    modules_telemetry_recorder["modules.telemetry_recorder"]
+    modules_safety_guard["modules.safety_guard"]
+    modules_wind_shear_detector["modules.wind_shear_detector"]
+    modules_wind_correction["modules.wind_correction"]
+    modules_synthetic_glidepath["modules.synthetic_glidepath"]
+    modules_virtual_joystick["modules.virtual_joystick"]
+    modules_turbulence_detector["modules.turbulence_detector"]
+    modules_telemetry["modules.telemetry"]
+    modules_structured_logger["modules.structured_logger"]
+    modules_stabilized_approach["modules.stabilized_approach"]
+    modules_navigation["modules.navigation"]
+    modules_fms_reader["modules.fms_reader"]
+    modules_flare_controller["modules.flare_controller"]
+    modules_dme_navigation["modules.dme_navigation"]
+    modules_command_gateway["modules.command_gateway"]
+    modules_control["modules.control"]
+    modules_connection_optimizer["modules.connection_optimizer"]
+    modules_connection_monitor["modules.connection_monitor"]
+    modules_autothrottle["modules.autothrottle"]
+    modules_autopilot_takeover["modules.autopilot_takeover"]
+    modules_approach_speed_calculator["modules.approach_speed_calculator"]
+    modules_approach_phases["modules.approach_phases"]
+    modules_aircraft_adapter["modules.aircraft_adapter"]
+    modules_settings_dialog["modules.settings_dialog"]
+    modules_wasm_version_checker["modules.wasm_version_checker"]
+    modules_approach_dialog["modules.approach_dialog"]
+    main["main"]
+    modules_aircraft_geometry["modules.aircraft_geometry"]
+  end
+  subgraph L1
+    gui["gui"]
+    modules_rudder_compensation["modules.rudder_compensation"]
+    modules_log_analyzer["modules.log_analyzer"]
+    modules_auto_fixer["modules.auto_fixer"]
+    modules_aileron_compensation["modules.aileron_compensation"]
+    modules___init__["modules.__init__"]
+  end
+  modules_aileron_compensation --> modules_aircraft_geometry
+  modules_aircraft_adapter -.-> modules_aircraft_config_reader
+  modules_aircraft_adapter -.-> modules_wasm_interface
+  modules_airports_database --> modules_ils_navigation
+  modules_airports_database --> modules_types
+  modules_approach_dialog --> modules_airports_database
+  modules_approach_dialog --> modules_ils_navigation
+  modules_approach_dialog --> modules_msfs_airport_reader
+  modules_approach_dialog --> modules_types
+  modules_approach_dialog -.-> modules_navigraph_parser
+  modules_approach_phases --> modules_control_ownership
+  modules_approach_phases -.-> main
+  modules_approach_phases -.-> modules_audio_alerts
+  modules_autothrottle --> modules_base_controller
+  modules_autothrottle --> modules_engine_failure_detector
+  modules_command_gateway --> modules_control_ownership
+  modules_flare_controller --> modules_thresholds_config
+  modules_msfs_airport_reader --> modules_navigraph_parser
+  modules_navigation --> modules_types
+  modules_navigraph_parser -.-> modules_settings
+  modules_settings_dialog --> modules_settings
+  modules_settings_dialog -.-> modules_navigraph_parser
+  modules_stabilized_approach --> modules_thresholds_config
+  modules_structured_logger --> modules_log_database
+  modules_synthetic_glidepath -.-> modules_navigation
+  modules_synthetic_glidepath -.-> modules_types
+  modules_turbulence_detector --> modules_thresholds_config
+  modules_wasm_interface --> modules_simconnect_client_data
+  modules_wind_shear_detector --> modules_thresholds_config
+  main --> modules_aircraft_adapter
+  main ==> modules_approach_phases
+  main --> modules_approach_speed_calculator
+  main --> modules_audio_alerts
+  main --> modules_autopilot_takeover
+  main --> modules_autothrottle
+  main --> modules_connection_monitor
+  main --> modules_connection_optimizer
+  main --> modules_control
+  main --> modules_command_gateway
+  main --> modules_control_ownership
+  main --> modules_dme_navigation
+  main --> modules_flare_controller
+  main --> modules_fms_reader
+  main --> modules_ils_navigation
+  main --> modules_navigation
+  main --> modules_types
+  main --> modules_stabilized_approach
+  main --> modules_structured_logger
+  main --> modules_telemetry
+  main --> modules_turbulence_detector
+  main --> modules_virtual_joystick
+  main --> modules_synthetic_glidepath
+  main --> modules_wind_correction
+  main --> modules_wind_shear_detector
+  main --> modules_safety_guard
+  main --> modules_telemetry_recorder
+  gui --> main
+  gui --> modules_approach_dialog
+  gui --> modules_wasm_version_checker
+  gui -.-> modules_settings_dialog

@@ -1,0 +1,34 @@
+digraph command_flow {
+    rankdir=TB;
+    node [shape=box, style=filled, fontname="Arial", fontsize=9];
+
+    subgraph cluster_request {
+        label="Command Request"; style=filled; fillcolor="#e8f5e9";
+        PHASE [label="PhaseState\nhandle()", fillcolor="#c8e6c9"];
+        GUARD [label="SafetyGuard\n(main._handle_phase)", fillcolor="#ffcdd2"];
+    }
+
+    subgraph cluster_ownership {
+        label="Ownership"; style=filled; fillcolor="#fff3e0";
+        COMPUTE [label="compute_ownership()\ncontrol_ownership.py:34", fillcolor="#ffe0b2"];
+        GW [label="CommandGateway\nsource_scope()", fillcolor="#ffe0b2"];
+        AUTH [label="_authorize()\nallow / CommandRejected", fillcolor="#ffe0b2"];
+    }
+
+    subgraph cluster_backends {
+        label="Actuator Backends"; style=filled; fillcolor="#f3e5f5";
+        SIM [label="control.py\nSimConnect events", fillcolor="#e1bee7"];
+        VJOY [label="virtual_joystick.py\nvJoy HID axes", fillcolor="#e1bee7"];
+        ADAPT [label="aircraft_adapter.py\nWASM/LVAR", fillcolor="#e1bee7"];
+    }
+
+    PHASE -> COMPUTE [label="telemetry → ownership"];
+    PHASE -> GW [label="source_scope(SAFETY)"];
+    GUARD -> GW [label="source_scope(SAFETY)"];
+    GW -> AUTH;
+    AUTH -> SIM [label="AIRCRAFT_AP"];
+    AUTH -> VJOY [label="EXTERNAL"];
+    AUTH -> ADAPT [label="WASM/LVAR"];
+
+    GW -> SIM [label="SAFETY override\n(bypasses auth)", style=dashed, color=red];
+}

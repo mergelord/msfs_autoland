@@ -1,0 +1,50 @@
+{
+  "scenario": "loc_signal_loss",
+  "phase_before": null,
+  "phase_after": "IDLE",
+  "go_around": true,
+  "stop": false,
+  "exception": null,
+  "entries": [
+    {
+      "index": 1,
+      "command": "_calculate_approach_data()",
+      "authorization": "N/A",
+      "backend": "main.py:660",
+      "args": {},
+      "result": "entered"
+    },
+    {
+      "index": 2,
+      "command": "calculate_loc_approach()",
+      "authorization": "N/A",
+      "backend": "main.py:673",
+      "args": {},
+      "result": "LOC path entered"
+    },
+    {
+      "index": 3,
+      "command": "loc_available=False",
+      "authorization": "N/A",
+      "backend": "main.py:674",
+      "args": {},
+      "result": "signal lost detected"
+    },
+    {
+      "index": 4,
+      "command": "set_pending_frame()",
+      "authorization": "N/A",
+      "backend": "main.py:678",
+      "args": {},
+      "result": "pending frame set"
+    },
+    {
+      "index": 5,
+      "command": "execute_go_around()",
+      "authorization": "SAFETY_SCOPE",
+      "backend": "main.py:684",
+      "args": {},
+      "result": "go-around triggered"
+    }
+  ]
+}

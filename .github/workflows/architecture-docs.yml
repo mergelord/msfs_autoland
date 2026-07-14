@@ -1,0 +1,52 @@
+name: Architecture Documentation
+
+on:
+  pull_request:
+    paths:
+      - 'docs/architecture/**'
+      - 'main.py'
+      - 'gui.py'
+      - 'modules/**/*.py'
+      - '.github/workflows/architecture-docs.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'docs/architecture/**'
+      - 'main.py'
+      - 'gui.py'
+      - 'modules/**/*.py'
+      - '.github/workflows/architecture-docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-architecture-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Validate architecture snapshot
+        run: python docs/architecture/snapshots/3971ba1/verify_runtime_architecture.py
+
+  check-architecture-freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Check architecture freshness
+        run: |
+          python docs/architecture/check_snapshot_freshness.py \
+            --repo-root . \
+            --current-file docs/architecture/CURRENT.json \
+            --diff-root docs/architecture/diffs \
+            --json-output

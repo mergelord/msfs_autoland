@@ -447,7 +447,7 @@ class VJoyThrottleIntegration:
 
     def enable(self):
         """Включить управление тягой через vJoy"""
-        if self.vjoy.connected:
+        if self.vjoy.enabled:
             self.enabled = True
             logger.info("vJoy throttle control enabled")
             return True
@@ -467,18 +467,14 @@ class VJoyThrottleIntegration:
         Args:
             throttle_value: Значение тяги (0.0 - 1.0)
         """
-        if not self.enabled or not self.vjoy.connected:
+        if not self.enabled or not self.vjoy.enabled:
             return False
 
         try:
-            # vJoy ожидает значение от -1.0 до +1.0
-            # Преобразуем 0.0-1.0 в диапазон vJoy
-            vjoy_value = (throttle_value * 2.0) - 1.0
+            # VirtualJoystick.set_throttle expects 0.0–1.0
+            self.vjoy.set_throttle(throttle_value)
 
-            # Устанавливаем через vJoy
-            self.vjoy.set_throttle(vjoy_value)
-
-            logger.debug("vJoy throttle set: %s (%s)", throttle_value, vjoy_value)
+            logger.debug("vJoy throttle set: %s", throttle_value)
             return True
 
         except Exception as e:

@@ -711,3 +711,125 @@ class TestRedWithoutFix:
         system._handle_phase(telemetry, approach_data)
         system.execute_go_around.assert_not_called()
         system.phase_state.handle.assert_called_once()
+
+
+# --- FIX-03: NaN/inf safety guard ---
+
+def test_safety_guard_nan_no_fail_open():
+    """FIX-03: _safe_float replaces NaN/inf with default, preventing fail-open."""
+    import math
+    from modules.safety_guard import _safe_float
+
+    assert _safe_float(math.nan, 0.0) == 0.0
+    assert _safe_float(math.inf, 0.0) == 0.0
+    assert _safe_float(-math.inf, 0.0) == 0.0
+    assert _safe_float(None, 0.0) == 0.0
+    assert _safe_float(120.0, 0.0) == 120.0
+    assert _safe_float("bad", 0.0) == 0.0
+
+
+# --- REM-01: NaN/inf integration tests ---
+
+def _make_config(approach_speed=120.0):
+    """Minimal config stub for SafetySnapshot.from_telemetry."""
+    from types import SimpleNamespace
+    return SimpleNamespace(approach_speed=approach_speed)
+
+
+def _build_flags(raw_telemetry):
+    """Derive has_* flags from raw telemetry using _is_finite_number."""
+    from modules.safety_guard import _is_finite_number
+    position = raw_telemetry.get('position', {})
+    speed = raw_telemetry.get('speed', {})
+    attitude = raw_telemetry.get('attitude', {})
+    return {
+        'has_altitude': _is_finite_number(position.get('altitude_agl')),
+        'has_radio_height': _is_finite_number(position.get('radio_height')),
+        'has_airspeed': _is_finite_number(speed.get('airspeed_indicated')),
+        'has_vs': _is_finite_number(speed.get('vertical_speed')),
+        'has_bank': _is_finite_number(attitude.get('bank')),
+    }
+
+
+def _eval(raw_telemetry, debounce_n=1):
+    """Full integration: raw telemetry → snapshot → guard.evaluate → result."""
+    from modules.safety_guard import ApproachSafetyGuard, SafetySnapshot
+    config = _make_config()
+    snapshot = SafetySnapshot.from_telemetry(raw_telemetry, config)
+    flags = _build_flags(raw_telemetry)
+    guard = ApproachSafetyGuard(debounce_n=debounce_n)
+    return guard.evaluate(snapshot, **flags)
+
+
+def _nominal_telemetry(**overrides):
+    """Return a complete nominal telemetry dict, with optional overrides."""
+    base = {
+        'position': {'altitude_agl': 500.0, 'radio_height': 200.0},
+        'speed': {'airspeed_indicated': 120.0, 'vertical_speed': -700.0},
+        'attitude': {'bank': 5.0},
+    }
+    for section, values in overrides.items():
+        if section in base:
+            base[section] = {**base[section], **values}
+        else:
+            base[section] = values
+    return base
+
+
+class TestREM01_NaN_Inf_Integration:
+    """REM-01: NaN/inf must trigger INVALID_TELEMETRY via real integration path."""
+
+    def test_vs_nan(self):
+        result = _eval(_nominal_telemetry(speed={'vertical_speed': float('nan')}))
+        assert result.decision == GuardDecision.GO_AROUND
+        assert result.reason == "INVALID_TELEMETRY"
+
+    def test_vs_inf(self):
+        result = _eval(_nominal_telemetry(speed={'vertical_speed': float('inf')}))
+        assert result.decision == GuardDecision.GO_AROUND
+        assert result.reason == "INVALID_TELEMETRY"
+
+    def test_bank_nan(self):
+        result = _eval(_nominal_telemetry(attitude={'bank': float('nan')}))
+        assert result.decision == GuardDecision.GO_AROUND
+        assert result.reason == "INVALID_TELEMETRY"
+
+    def test_airspeed_nan(self):
+        result = _eval(_nominal_telemetry(speed={'airspeed_indicated': float('nan')}))
+        assert result.decision == GuardDecision.GO_AROUND
+        assert result.reason == "INVALID_TELEMETRY"
+
+    def test_radio_height_nan_with_valid_altitude(self):
+        """NaN radio_height with finite altitude_agl → NOT invalid (altitude fallback)."""
+        result = _eval(_nominal_telemetry(
+            position={'radio_height': float('nan'), 'altitude_agl': 500.0}))
+        assert result.decision == GuardDecision.CONTINUE
+
+    def test_both_heights_nan(self):
+        """Both radio_height and altitude_agl NaN → INVALID_TELEMETRY."""
+        result = _eval(_nominal_telemetry(
+            position={'radio_height': float('nan'), 'altitude_agl': float('nan')}))
+        assert result.decision == GuardDecision.GO_AROUND
+        assert result.reason == "INVALID_TELEMETRY"
+
+    def test_all_finite_nominal(self):
+        """All finite values → CONTINUE."""
+        result = _eval(_nominal_telemetry())
+        assert result.decision == GuardDecision.CONTINUE
+
+    def test_none_vs(self):
+        """None vertical_speed → INVALID_TELEMETRY."""
+        result = _eval(_nominal_telemetry(speed={'vertical_speed': None}))
+        assert result.decision == GuardDecision.GO_AROUND
+        assert result.reason == "INVALID_TELEMETRY"
+
+    def test_from_telemetry_prefers_finite_radio(self):
+        """from_telemetry picks finite radio_height over NaN altitude_agl."""
+        from modules.safety_guard import SafetySnapshot
+        telemetry = {
+            'position': {'radio_height': 200.0, 'altitude_agl': float('nan')},
+            'speed': {'airspeed_indicated': 120.0, 'vertical_speed': -700.0},
+            'attitude': {'bank': 5.0},
+        }
+        snap = SafetySnapshot.from_telemetry(telemetry, _make_config())
+        assert snap.radio_height == 200.0

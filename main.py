@@ -36,7 +36,7 @@ from modules.virtual_joystick import VirtualJoystick
 from modules.synthetic_glidepath import SyntheticGlidepath
 from modules.wind_correction import WindCorrection
 from modules.wind_shear_detector import WindShearDetector
-from modules.safety_guard import ApproachSafetyGuard, SafetySnapshot, GuardDecision
+from modules.safety_guard import ApproachSafetyGuard, SafetySnapshot, GuardDecision, _is_finite_number
 from modules.telemetry_recorder import TelemetryRecorder
 
 # Настройка логирования
@@ -448,9 +448,9 @@ class AutoLandSystem:
             self.control.set_flaps(2)
             logger.info("Go-around: Flaps to takeoff position")
 
-        # F3: real gear UP command (was a comment before)
-        self.control.set_gear(False)
-        logger.info("Go-around: Gear UP")
+            # F3: real gear UP command
+            self.control.set_gear(False)
+            logger.info("Go-around: Gear UP")
 
         # 5. Если vJoy доступен, центрируем управление
         if self.use_vjoy:
@@ -475,6 +475,7 @@ class AutoLandSystem:
             # Получение телеметрии
             telemetry = self.telemetry.get_all_data()
             weather = telemetry.get('weather', {})
+            weight_data = telemetry.get('weight', {})
             aircraft = telemetry.get('aircraft', {})
 
             # Расчёт встречного ветра
@@ -487,8 +488,17 @@ class AutoLandSystem:
             # Расчёт параметров захода
             self.approach_params = self.speed_calculator.calculate_approach_parameters(
                 aircraft_title=aircraft.get('title', 'Unknown'),
-                aircraft_weight_kg=aircraft.get('total_weight', 60000),
-                runway_length_m=config.runway_length if hasattr(config, 'runway_length') else 2500,
+                # SimConnect TOTAL_WEIGHT is in pounds → convert to kg
+                aircraft_weight_kg=(
+                    weight_data.get('total_weight', 132277) * 0.453592
+                    if weight_data.get('total_weight') is not None
+                    else 60000
+                ),
+                runway_length_m=(
+                    config.runway_length / 3.28084  # ApproachConfig.runway_length is in FEET
+                    if hasattr(config, 'runway_length')
+                    else 762  # ~2500 ft in meters
+                ),
                 runway_elevation_ft=config.runway_elevation if hasattr(config, 'runway_elevation') else 0,
                 temperature_c=weather.get('ambient_temperature', 15),
                 headwind_kt=headwind,
@@ -724,11 +734,11 @@ class AutoLandSystem:
             attitude_data = telemetry.get('attitude', {})
             guard_result = self.safety_guard.evaluate(
                 snapshot,
-                has_altitude=position.get('altitude_agl') is not None,
-                has_radio_height=position.get('radio_height') is not None,
-                has_airspeed=speed_data.get('airspeed_indicated') is not None,
-                has_vs=speed_data.get('vertical_speed') is not None,
-                has_bank=attitude_data.get('bank') is not None,
+                has_altitude=_is_finite_number(position.get('altitude_agl')),
+                has_radio_height=_is_finite_number(position.get('radio_height')),
+                has_airspeed=_is_finite_number(speed_data.get('airspeed_indicated')),
+                has_vs=_is_finite_number(speed_data.get('vertical_speed')),
+                has_bank=_is_finite_number(attitude_data.get('bank')),
             )
             if guard_result.decision == GuardDecision.GO_AROUND:
                 self._last_guard_decision = "GO_AROUND"

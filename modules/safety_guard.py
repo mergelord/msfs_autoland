@@ -11,11 +11,23 @@ from different rules do NOT accumulate.
 """
 
 import logging
+import math
 from dataclasses import dataclass
 from enum import Enum
 from typing import Dict
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_float(value, default: float) -> float:
+    """Return default if value is None, NaN, or infinite."""
+    if value is None:
+        return default
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return default
+    return f if math.isfinite(f) else default
 
 # Debounce: consecutive frames before GO_AROUND
 DEBOUNCE_N = 2
@@ -64,15 +76,11 @@ class SafetySnapshot:
         height = radio_height if radio_height is not None else altitude_agl
 
         return cls(
-            altitude_agl=altitude_agl if altitude_agl is not None else 0.0,
-            radio_height=height if height is not None else 0.0,
-            airspeed_indicated=(speed.get('airspeed_indicated')
-                                if speed.get('airspeed_indicated') is not None
-                                else 0.0),
-            vertical_speed=(speed.get('vertical_speed')
-                            if speed.get('vertical_speed') is not None
-                            else 0.0),
-            bank=abs(attitude.get('bank') if attitude.get('bank') is not None else 0.0),
+            altitude_agl=_safe_float(altitude_agl, 0.0),
+            radio_height=_safe_float(height, 0.0),
+            airspeed_indicated=_safe_float(speed.get('airspeed_indicated'), 0.0),
+            vertical_speed=_safe_float(speed.get('vertical_speed'), 0.0),
+            bank=abs(_safe_float(attitude.get('bank'), 0.0)),
             vref=config.approach_speed,
         )
 

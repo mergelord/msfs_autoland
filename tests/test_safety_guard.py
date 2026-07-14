@@ -711,3 +711,18 @@ class TestRedWithoutFix:
         system._handle_phase(telemetry, approach_data)
         system.execute_go_around.assert_not_called()
         system.phase_state.handle.assert_called_once()
+
+
+# --- FIX-03: NaN/inf safety guard ---
+
+def test_safety_guard_nan_no_fail_open():
+    """FIX-03: _safe_float replaces NaN/inf with default, preventing fail-open."""
+    import math
+    from modules.safety_guard import _safe_float
+
+    assert _safe_float(math.nan, 0.0) == 0.0
+    assert _safe_float(math.inf, 0.0) == 0.0
+    assert _safe_float(-math.inf, 0.0) == 0.0
+    assert _safe_float(None, 0.0) == 0.0
+    assert _safe_float(120.0, 0.0) == 120.0
+    assert _safe_float("bad", 0.0) == 0.0

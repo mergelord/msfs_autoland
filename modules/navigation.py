@@ -209,8 +209,11 @@ class Navigation:
         base_distance = (ground_speed / 60.0) ** 2 * 1000
 
         # Коррекция на ветер (встречный ветер уменьшает дистанцию)
-        wind_factor = 1.0 - (headwind / ground_speed * 0.3)
-        wind_factor = max(0.5, min(1.5, wind_factor))
+        if ground_speed > 0:
+            wind_factor = 1.0 - (headwind / ground_speed * 0.3)
+            wind_factor = max(0.5, min(1.5, wind_factor))
+        else:
+            wind_factor = 1.0  # no wind correction when stationary
 
         # Коррекция на вес (больше вес = больше дистанция)
         weight_factor = weight_lbs / 5000.0

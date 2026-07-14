@@ -37,3 +37,8 @@ warn_unused_configs = false
 [[tool.mypy.overrides]]
 module = ["SimConnect", "pyvjoy", "pyvjoy.*", "gtts", "pygame", "pygame.*"]
 ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+# Root test_*.py require hardware (SimConnect/MSFS/WASM) and are excluded from CI.
+# They can be run locally with: pytest test_*.py
+testpaths = ["tests"]

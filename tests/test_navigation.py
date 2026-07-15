@@ -62,7 +62,6 @@ def test_runway_beacons_near_pole():
 
 def test_vor_approach_exact_inbound_match():
     """NAV-F2 red-without-fix: aircraft exactly on inbound final course must give ~0° error."""
-    import math
     from modules.navigation import Navigation
     from modules.types import ApproachConfig, NavStation
 
@@ -245,7 +244,6 @@ def test_runway_beacons_standard_config():
 
 def test_runway_beacons_invalid_glideslope_angle():
     """NAV-F3: glideslope_angle=0 or negative raises ValueError."""
-    import math
     from modules.navigation import Navigation
 
     nav = Navigation.__new__(Navigation)
@@ -256,7 +254,7 @@ def test_runway_beacons_invalid_glideslope_angle():
             runway_heading=90, runway_elevation=100,
             glideslope_angle=0.0,
         )
-        assert False, "Should have raised ValueError for glideslope_angle=0"
+        raise AssertionError("Should have raised ValueError for glideslope_angle=0")
     except ValueError:
         pass
 
@@ -267,7 +265,7 @@ def test_runway_beacons_invalid_glideslope_angle():
             runway_heading=90, runway_elevation=100,
             glideslope_angle=-3.0,
         )
-        assert False, "Should have raised ValueError for negative glideslope_angle"
+        raise AssertionError("Should have raised ValueError for negative glideslope_angle")
     except ValueError:
         pass
 
@@ -278,7 +276,7 @@ def test_runway_beacons_invalid_glideslope_angle():
             runway_heading=90, runway_elevation=100,
             glideslope_angle=float('nan'),
         )
-        assert False, "Should have raised ValueError for NaN glideslope_angle"
+        raise AssertionError("Should have raised ValueError for NaN glideslope_angle")
     except ValueError:
         pass
 
@@ -289,7 +287,7 @@ def test_runway_beacons_invalid_glideslope_angle():
             runway_heading=90, runway_elevation=100,
             glideslope_angle=float('inf'),
         )
-        assert False, "Should have raised ValueError for +inf glideslope_angle"
+        raise AssertionError("Should have raised ValueError for +inf glideslope_angle")
     except ValueError:
         pass
 
@@ -306,7 +304,7 @@ def test_runway_beacons_invalid_distances():
             runway_heading=90, runway_elevation=100,
             outer_distance_nm=-1.0,
         )
-        assert False, "Should have raised ValueError for negative outer_distance_nm"
+        raise AssertionError("Should have raised ValueError for negative outer_distance_nm")
     except ValueError:
         pass
 
@@ -317,7 +315,7 @@ def test_runway_beacons_invalid_distances():
             runway_heading=90, runway_elevation=100,
             inner_distance_nm=float('nan'),
         )
-        assert False, "Should have raised ValueError for NaN inner_distance_nm"
+        raise AssertionError("Should have raised ValueError for NaN inner_distance_nm")
     except ValueError:
         pass
 
@@ -328,7 +326,7 @@ def test_runway_beacons_invalid_distances():
             runway_heading=90, runway_elevation=100,
             outer_distance_nm=float('inf'),
         )
-        assert False, "Should have raised ValueError for +inf outer_distance_nm"
+        raise AssertionError("Should have raised ValueError for +inf outer_distance_nm")
     except ValueError:
         pass
 
@@ -345,7 +343,104 @@ def test_runway_beacons_outer_less_than_inner():
             outer_distance_nm=1.0,
             inner_distance_nm=5.0,
         )
-        assert False, "Should have raised ValueError for outer < inner"
+        raise AssertionError("Should have raised ValueError for outer < inner")
+    except ValueError:
+        pass
+
+
+def test_runway_beacons_invalid_coordinates():
+    """NAV-F3: NaN/inf in coordinates raises ValueError."""
+    from modules.navigation import Navigation
+
+    nav = Navigation.__new__(Navigation)
+    # NaN latitude
+    try:
+        nav.calculate_runway_beacons(
+            runway_threshold_lat=float('nan'), runway_threshold_lon=90.0,
+            runway_heading=90, runway_elevation=100,
+        )
+        raise AssertionError("Should have raised ValueError for NaN lat")
+    except ValueError:
+        pass
+
+    # inf longitude
+    try:
+        nav.calculate_runway_beacons(
+            runway_threshold_lat=45.0, runway_threshold_lon=float('inf'),
+            runway_heading=90, runway_elevation=100,
+        )
+        raise AssertionError("Should have raised ValueError for inf lon")
+    except ValueError:
+        pass
+
+    # Latitude out of range
+    try:
+        nav.calculate_runway_beacons(
+            runway_threshold_lat=91.0, runway_threshold_lon=90.0,
+            runway_heading=90, runway_elevation=100,
+        )
+        raise AssertionError("Should have raised ValueError for lat > 90")
+    except ValueError:
+        pass
+
+    try:
+        nav.calculate_runway_beacons(
+            runway_threshold_lat=-91.0, runway_threshold_lon=90.0,
+            runway_heading=90, runway_elevation=100,
+        )
+        raise AssertionError("Should have raised ValueError for lat < -90")
+    except ValueError:
+        pass
+
+
+def test_runway_beacons_invalid_heading_elevation():
+    """NAV-F3: NaN/inf in heading or elevation raises ValueError."""
+    from modules.navigation import Navigation
+
+    nav = Navigation.__new__(Navigation)
+    # NaN heading
+    try:
+        nav.calculate_runway_beacons(
+            runway_threshold_lat=45.0, runway_threshold_lon=90.0,
+            runway_heading=float('nan'), runway_elevation=100,
+        )
+        raise AssertionError("Should have raised ValueError for NaN heading")
+    except ValueError:
+        pass
+
+    # inf elevation
+    try:
+        nav.calculate_runway_beacons(
+            runway_threshold_lat=45.0, runway_threshold_lon=90.0,
+            runway_heading=90, runway_elevation=float('inf'),
+        )
+        raise AssertionError("Should have raised ValueError for inf elevation")
+    except ValueError:
+        pass
+
+    # -inf heading
+    try:
+        nav.calculate_runway_beacons(
+            runway_threshold_lat=45.0, runway_threshold_lon=90.0,
+            runway_heading=float('-inf'), runway_elevation=100,
+        )
+        raise AssertionError("Should have raised ValueError for -inf heading")
+    except ValueError:
+        pass
+
+
+def test_runway_beacons_extreme_glideslope():
+    """NAV-F3: glideslope > 15° raises ValueError."""
+    from modules.navigation import Navigation
+
+    nav = Navigation.__new__(Navigation)
+    try:
+        nav.calculate_runway_beacons(
+            runway_threshold_lat=45.0, runway_threshold_lon=90.0,
+            runway_heading=90, runway_elevation=100,
+            glideslope_angle=20.0,
+        )
+        raise AssertionError("Should have raised ValueError for glideslope > 15°")
     except ValueError:
         pass
 
@@ -353,7 +448,7 @@ def test_runway_beacons_outer_less_than_inner():
 # --- NAV-F4: wrap bug in check_beacon_passage ---
 
 def test_beacon_passage_wrap_359_0():
-    """NAV-F4 red-without-fix: current=359°, expected=0° → error ≈ +1°, course_ok=True."""
+    """NAV-F4 red-without-fix: current=359°, expected=0° → error ≈ -1°, course_ok=True."""
     from modules.navigation import Navigation
     from modules.types import RunwayBeacon
 
@@ -374,15 +469,15 @@ def test_beacon_passage_wrap_359_0():
         beacon=beacon,
         expected_course=0.0,
     )
-    # NAV-F4: angle_difference(359, 0) = +1° (not 359°)
-    assert abs(result.course_error_deg - 1.0) < 0.5, (
+    # NAV-F4: angle_difference(expected=0, current=359) = -1° (current is 1° less)
+    assert abs(result.course_error_deg - (-1.0)) < 0.5, (
         f"NAV-F4 defect: 359° vs 0° gave course_error={result.course_error_deg:.1f}°"
     )
     assert result.course_ok is True
 
 
 def test_beacon_passage_wrap_1_0():
-    """NAV-F4: current=1°, expected=0° → error ≈ -1°."""
+    """NAV-F4: current=1°, expected=0° → error ≈ +1°."""
     from modules.navigation import Navigation
     from modules.types import RunwayBeacon
 
@@ -403,13 +498,13 @@ def test_beacon_passage_wrap_1_0():
         beacon=beacon,
         expected_course=0.0,
     )
-    # angle_difference(1, 0) = -1°
-    assert abs(result.course_error_deg - (-1.0)) < 0.5
+    # angle_difference(expected=0, current=1) = +1°
+    assert abs(result.course_error_deg - 1.0) < 0.5
     assert result.course_ok is True
 
 
 def test_beacon_passage_wrap_0_359():
-    """NAV-F4: current=0°, expected=359° → error ≈ -1°."""
+    """NAV-F4: current=0°, expected=359° → error ≈ +1°."""
     from modules.navigation import Navigation
     from modules.types import RunwayBeacon
 
@@ -430,8 +525,8 @@ def test_beacon_passage_wrap_0_359():
         beacon=beacon,
         expected_course=359.0,
     )
-    # angle_difference(0, 359) = -1°
-    assert abs(result.course_error_deg - (-1.0)) < 0.5
+    # angle_difference(expected=359, current=0) = +1° (via wrap)
+    assert abs(result.course_error_deg - 1.0) < 0.5
     assert result.course_ok is True
 
 
@@ -458,8 +553,8 @@ def test_beacon_passage_beyond_tolerance():
         expected_course=0.0,
     )
     assert result.course_ok is False
-    # angle_difference(20, 0) = -20°
-    assert abs(result.course_error_deg - (-20.0)) < 0.5
+    # angle_difference(expected=0, current=20) = +20°
+    assert abs(result.course_error_deg - 20.0) < 0.5
 
 
 def test_beacon_passage_altitude_speed_violations_unchanged():
@@ -703,3 +798,169 @@ def test_navf1_downstream_synthetic_glidepath():
     # and past intercept point
     assert vs > 0, f"NAV-F1 downstream: compute_target_vs returned {vs} (expected positive descent)"
     assert math.isfinite(vs)
+
+
+# --- NAV-F1 strengthened tests (addendum requirements) ---
+
+def test_navf1_after_threshold_strict_zero():
+    """NAV-F1 addendum: after threshold on 0.1, 1, and 5 NM, ideal_altitude == 0."""
+    nav, ip = _make_nav_and_intercept()
+    threshold_lat = 45.0
+    threshold_lon = 90.0
+    cos_lat = math.cos(math.radians(threshold_lat))
+
+    # Points past threshold along extended centerline (negative along-track)
+    for past_nm in [0.1, 1.0, 5.0]:
+        # Move past threshold in the direction away from approach (eastward for heading 090)
+        past_lon = threshold_lon + past_nm / (60.0 * cos_lat)
+        result = nav.should_start_descent(
+            current_lat=threshold_lat,
+            current_lon=past_lon,
+            current_altitude_agl=0.0,
+            intercept_point=ip,
+        )
+        assert math.isfinite(result['ideal_altitude_agl'])
+        assert result['ideal_altitude_agl'] == 0.0, (
+            f"After threshold at {past_nm} NM: expected 0 ft, got {result['ideal_altitude_agl']}"
+        )
+
+
+def test_navf1_before_intercept_strict_hold():
+    """NAV-F1 addendum: before intercept on 0.1, 1, and 5 NM, altitude held at intercept."""
+    nav, ip = _make_nav_and_intercept()
+    threshold_lat = 45.0
+    threshold_lon = 90.0
+
+    intercept_alt = ip['altitude_agl']
+    intercept_to_thresh = ip['intercept_to_threshold_nm']
+    cos_lat = math.cos(math.radians(threshold_lat))
+
+    # Points before intercept along extended centerline (beyond intercept)
+    for extra_nm in [0.1, 1.0, 5.0]:
+        total_nm = intercept_to_thresh + extra_nm
+        # Move further from threshold than intercept (westward for heading 090)
+        # 1 NM longitude = 1/(60*cos(lat)) degrees
+        before_lon = threshold_lon - total_nm / (60.0 * cos_lat)
+        result = nav.should_start_descent(
+            current_lat=threshold_lat,
+            current_lon=before_lon,
+            current_altitude_agl=intercept_alt,
+            intercept_point=ip,
+        )
+        assert math.isfinite(result['ideal_altitude_agl'])
+        assert abs(result['ideal_altitude_agl'] - intercept_alt) < 1.0, (
+            f"Before intercept at {extra_nm} NM extra: expected {intercept_alt}, "
+            f"got {result['ideal_altitude_agl']}"
+        )
+
+
+def test_navf1_cross_track_strict_tolerance():
+    """NAV-F1 addendum: same along-track with cross-track 0, 0.5, 2 NM → profile matches tightly."""
+    import pytest
+    nav, ip = _make_nav_and_intercept()
+    threshold_lat = 45.0
+    threshold_lon = 90.0
+
+    # 50% point on centerline
+    lat_center = ip['latitude'] * 0.5 + threshold_lat * 0.5
+    lon_center = ip['longitude'] * 0.5 + threshold_lon * 0.5
+    result_center = nav.should_start_descent(
+        current_lat=lat_center, current_lon=lon_center,
+        current_altitude_agl=500.0, intercept_point=ip,
+    )
+    center_alt = result_center['ideal_altitude_agl']
+
+    # Cross-track offsets: 0.5 NM and 2 NM (perpendicular = latitude offset for heading 090)
+    for ct_nm in [0.5, 2.0]:
+        ct_deg = ct_nm / 60.0  # ~NM to degrees lat
+        result_offset = nav.should_start_descent(
+            current_lat=lat_center + ct_deg,
+            current_lon=lon_center,
+            current_altitude_agl=500.0, intercept_point=ip,
+        )
+        assert math.isfinite(result_offset['ideal_altitude_agl'])
+        assert result_offset['ideal_altitude_agl'] == pytest.approx(
+            center_alt, rel=1e-3, abs=1.0
+        ), (
+            f"Cross-track {ct_nm} NM changed profile: {center_alt} vs {result_offset['ideal_altitude_agl']}"
+        )
+
+
+def test_navf1_past_threshold_not_before_intercept():
+    """NAV-F1 addendum: points past threshold never classified as before-intercept."""
+    nav, ip = _make_nav_and_intercept()
+    threshold_lat = 45.0
+    threshold_lon = 90.0
+    cos_lat = math.cos(math.radians(threshold_lat))
+
+    for past_nm in [0.1, 1.0, 5.0, 50.0]:
+        past_lon = threshold_lon + past_nm / (60.0 * cos_lat)
+        result = nav.should_start_descent(
+            current_lat=threshold_lat,
+            current_lon=past_lon,
+            current_altitude_agl=0.0,
+            intercept_point=ip,
+        )
+        # ideal_altitude should be 0, not intercept altitude (2000)
+        assert result['ideal_altitude_agl'] == 0.0, (
+            f"Past threshold at {past_nm} NM got ideal={result['ideal_altitude_agl']} "
+            f"(should be 0, not intercept altitude)"
+        )
+
+
+def test_navf1_near_threshold_vertical_deviation_finite():
+    """NAV-F1 addendum: near-threshold vertical deviation uses along-track and stays finite."""
+    nav, ip = _make_nav_and_intercept()
+    threshold_lat = 45.0
+    threshold_lon = 90.0
+    cos_lat = math.cos(math.radians(threshold_lat))
+
+    # Very close to threshold (0.05 NM)
+    close_lon = threshold_lon + 0.05 / (60.0 * cos_lat)
+    result = nav.should_start_descent(
+        current_lat=threshold_lat,
+        current_lon=close_lon,
+        current_altitude_agl=10.0,
+        intercept_point=ip,
+    )
+    assert math.isfinite(result['vertical_deviation_dots'])
+    assert math.isfinite(result['ideal_altitude_agl'])
+
+
+def test_navf1_downstream_no_false_profile_after_threshold():
+    """NAV-F1 addendum: SyntheticGlidepath doesn't get false profile after threshold."""
+    from modules.navigation import Navigation
+    from modules.types import ApproachConfig, NavStation
+    from modules.synthetic_glidepath import SyntheticGlidepath
+
+    nav = Navigation.__new__(Navigation)
+    station = NavStation(name="TEST", frequency=110.0,
+                         latitude=45.0, longitude=90.0, type="VOR")
+    config = ApproachConfig(
+        station=station,
+        final_approach_course=90,
+        glideslope_angle=3.0,
+        decision_height=200,
+        approach_speed=90,
+        runway_elevation=100,
+        runway_length=3000,
+        runway_width=45,
+        runway_threshold_lat=45.0,
+        runway_threshold_lon=90.0,
+    )
+    glidepath = SyntheticGlidepath(nav, config)
+
+    # Position past threshold (east of threshold for heading 090)
+    telemetry_past = {
+        'position': {
+            'latitude': 45.0,
+            'longitude': 90.5,  # ~30 NM past threshold
+            'altitude': 100,  # MSL (at runway elevation)
+            'altitude_agl': 0,
+        }
+    }
+    vs_past = glidepath.compute_target_vs(telemetry_past, wind_correction_vs=0.0)
+    # After threshold: should not command descent (VS <= 0)
+    assert vs_past <= 0, (
+        f"NAV-F1 downstream: past threshold got VS={vs_past} (should be <= 0)"
+    )

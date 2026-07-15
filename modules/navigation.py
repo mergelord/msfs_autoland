@@ -57,6 +57,54 @@ class Navigation:
             diff += 360
         return diff
 
+    def calculate_signed_along_track(
+        self,
+        aircraft_lat: float,
+        aircraft_lon: float,
+        threshold_lat: float,
+        threshold_lon: float,
+        runway_heading: float,
+    ) -> tuple:
+        """
+        Calculate signed along-track and cross-track distances using local tangent-plane projection.
+
+        Returns:
+            (along_track_nm, cross_track_nm):
+            - along_track_nm: positive before threshold (approach side), 0 at threshold, negative after
+            - cross_track_nm: lateral offset from extended centerline (sign convention: + = right of course)
+        """
+        NM_PER_DEG_LAT = 60.0
+
+        # Delta from threshold to aircraft in degrees
+        delta_lat = aircraft_lat - threshold_lat
+        delta_lon = aircraft_lon - threshold_lon
+
+        # Convert to NM using local tangent-plane approximation
+        delta_north_nm = delta_lat * NM_PER_DEG_LAT
+        cos_lat = math.cos(math.radians(threshold_lat))
+        if abs(cos_lat) < 1e-6:
+            # Near pole: longitude projection undefined, use 0 for east-west
+            delta_east_nm = 0.0
+        else:
+            delta_east_nm = delta_lon * NM_PER_DEG_LAT * cos_lat
+
+        # Outbound runway axis (from threshold away from approach)
+        # Inbound final course = runway_heading, so outbound = runway_heading + 180
+        # Convert navigation heading to math angle: math_angle = 90 - heading
+        outbound_heading = (runway_heading + 180) % 360
+        outbound_math_rad = math.radians(90 - outbound_heading)
+
+        # Project delta onto outbound axis (along-track) and perpendicular (cross-track)
+        along_track_nm = (delta_north_nm * math.sin(outbound_math_rad) +
+                          delta_east_nm * math.cos(outbound_math_rad))
+
+        # Right perpendicular to outbound: math_angle = outbound_math - 90°
+        right_math_rad = math.radians(90 - outbound_heading - 90)
+        cross_track_nm = (delta_north_nm * math.sin(right_math_rad) +
+                           delta_east_nm * math.cos(right_math_rad))
+
+        return along_track_nm, cross_track_nm
+
     def calculate_intercept_heading(self, current_heading: float, target_radial: float,
                                    cross_track_error: float) -> float:
         """
@@ -398,49 +446,44 @@ class Navigation:
         Returns:
             Dict с решением и параметрами
         """
-        # NAV-F1: расстояние до точки входа (для определения фазы)
+        threshold_lat = intercept_point['threshold_lat']
+        threshold_lon = intercept_point['threshold_lon']
+        runway_heading = intercept_point['runway_heading']
+        intercept_to_threshold = intercept_point['intercept_to_threshold_nm']
+        feet_per_nm = intercept_point['feet_per_nm']
+        glideslope_angle = intercept_point['glideslope_angle']
+
+        # NAV-F1: signed along-track projection via local tangent-plane
+        along_track_nm, cross_track_nm = self.calculate_signed_along_track(
+            current_lat, current_lon,
+            threshold_lat, threshold_lon,
+            runway_heading,
+        )
+
+        # Scalar distance to intercept (for status/reason messages)
         distance_to_intercept = self.calculate_distance(
             current_lat, current_lon,
             intercept_point['latitude'], intercept_point['longitude']
         )
 
-        # NAV-F1: расстояние до порога ВПП (для профиля высоты)
-        threshold_lat = intercept_point['threshold_lat']
-        threshold_lon = intercept_point['threshold_lon']
-        distance_to_threshold = self.calculate_distance(
-            current_lat, current_lon,
-            threshold_lat, threshold_lon
-        )
+        # NAV-F1: profile distance along final axis, clamped to [0, intercept_to_threshold]
+        # along_track_nm > 0 means approach side (before threshold)
+        # along_track_nm = 0 means at threshold
+        # along_track_nm < 0 means past threshold
+        profile_distance = max(0.0, min(along_track_nm, intercept_to_threshold))
 
-        glideslope_angle = intercept_point['glideslope_angle']
-        intercept_altitude = intercept_point['altitude_agl']
-        intercept_to_threshold = intercept_point['intercept_to_threshold_nm']
-        feet_per_nm = intercept_point['feet_per_nm']
-
-        # NAV-F1: signed along-track profile
-        # Use distance_to_threshold relative to intercept_to_threshold:
-        # - If distance_to_threshold >= intercept_to_threshold: before intercept
-        # - If distance_to_threshold < intercept_to_threshold: past intercept, toward threshold
-        is_before_intercept = distance_to_threshold >= intercept_to_threshold
-
-        if is_before_intercept:
-            # Not yet at intercept: hold intercept altitude
-            ideal_altitude = intercept_altitude
-        else:
-            # Between intercept and threshold (or past): proportional to distance_to_threshold
-            ideal_altitude = distance_to_threshold * feet_per_nm
-
-        # Clamp: never negative
-        ideal_altitude = max(0.0, ideal_altitude)
+        # Ideal altitude from profile
+        ideal_altitude = profile_distance * feet_per_nm
 
         # Разница высот
         altitude_error = current_altitude_agl - ideal_altitude
 
         # Вертикальное отклонение в точках (dots)
         # 1 dot = 0.35° для ILS glideslope
+        # Use along-track distance for angle calculation (not scalar)
         vertical_deviation_dots = 0.0
-        if distance_to_intercept > 0.1:
-            actual_angle = math.degrees(math.atan(current_altitude_agl / (distance_to_intercept * 6076.12)))
+        if along_track_nm > 0.1:
+            actual_angle = math.degrees(math.atan(current_altitude_agl / (along_track_nm * 6076.12)))
             angle_error = actual_angle - glideslope_angle
             vertical_deviation_dots = angle_error / 0.35
 
@@ -561,10 +604,24 @@ class Navigation:
         # Обратный курс (от порога к приводам)
         reverse_heading = (runway_heading + 180) % 360
 
-        # NAV-F3: валидация входных параметров
+        # NAV-F3: валидация всех входных параметров
+        if not math.isfinite(runway_threshold_lat):
+            raise ValueError(f"runway_threshold_lat must be finite, got {runway_threshold_lat}")
+        if not (-90.0 <= runway_threshold_lat <= 90.0):
+            raise ValueError(f"runway_threshold_lat must be in [-90, 90], got {runway_threshold_lat}")
+        if not math.isfinite(runway_threshold_lon):
+            raise ValueError(f"runway_threshold_lon must be finite, got {runway_threshold_lon}")
+        if not math.isfinite(runway_heading):
+            raise ValueError(f"runway_heading must be finite, got {runway_heading}")
+        if not math.isfinite(runway_elevation):
+            raise ValueError(f"runway_elevation must be finite, got {runway_elevation}")
         if not math.isfinite(glideslope_angle) or glideslope_angle <= 0:
             raise ValueError(
                 f"glideslope_angle must be finite and positive, got {glideslope_angle}"
+            )
+        if glideslope_angle > 15.0:
+            raise ValueError(
+                f"glideslope_angle must be <= 15.0 (physically realistic), got {glideslope_angle}"
             )
         if not math.isfinite(outer_distance_nm) or outer_distance_nm < 0:
             raise ValueError(
@@ -677,7 +734,8 @@ class Navigation:
         altitude_ok = abs(altitude_error) <= beacon.tolerance_altitude_ft
 
         # Проверка курса — NAV-F4 fix: signed shortest-angle error [-180, +180]
-        course_error = self.angle_difference(current_heading, expected_course)
+        # angle_difference(a, b) = b - a, so we pass (expected, current) to get (current - expected)
+        course_error = self.angle_difference(expected_course, current_heading)
         course_ok = abs(course_error) <= beacon.tolerance_course_deg
 
         # Проверка скорости

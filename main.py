@@ -569,7 +569,8 @@ class AutoLandSystem:
                 data = self._get_telemetry_with_monitoring()
                 self._check_connection_optimization()
                 approach_data = self._calculate_approach_data(data)
-                self._handle_phase(data, approach_data)
+                with self.control.source_scope(CommandSource.AIRCRAFT_AP):
+                    self._handle_phase(data, approach_data)
 
                 # Write telemetry frame to CSV recorder
                 try:

@@ -30,7 +30,6 @@ class MsfsCfgParser(configparser.RawConfigParser):
             try:
                 with open(filename, encoding=encoding, errors="replace") as f:
                     content = f.read()
-                # Strip MSFS comments
                 lines = []
                 for line in content.splitlines():
                     stripped = line.split(";")[0].split("//")[0]
@@ -41,7 +40,6 @@ class MsfsCfgParser(configparser.RawConfigParser):
 
 
 def read_cfg(path: Path) -> MsfsCfgParser:
-    """Read a .cfg file, return parser (may be empty on error)."""
     cfg = MsfsCfgParser()
     if path.exists():
         try:
@@ -52,7 +50,6 @@ def read_cfg(path: Path) -> MsfsCfgParser:
 
 
 def find_cfg(package: Path, name: str) -> Path | None:
-    """Find a .cfg file in SimObjects/Airplanes subdirectories."""
     simobjects = package / "SimObjects" / "Airplanes"
     if not simobjects.exists():
         return None
@@ -62,6 +59,20 @@ def find_cfg(package: Path, name: str) -> Path | None:
             if cfg_path.exists():
                 return cfg_path
     return None
+
+
+# ---------------------------------------------------------------------------
+# FIX-3: Strip quotes and trim
+# ---------------------------------------------------------------------------
+
+def strip_quotes(val: str | None) -> str | None:
+    """Remove surrounding quotes (single or double) and trim whitespace."""
+    if val is None:
+        return None
+    val = val.strip()
+    if len(val) >= 2 and val[0] == val[-1] and val[0] in ('"', "'"):
+        val = val[1:-1].strip()
+    return val if val else None
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +91,7 @@ def extract_manifest(package: Path) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
-# Aircraft CFG
+# Aircraft CFG (FIX-3: strip quotes)
 # ---------------------------------------------------------------------------
 
 def extract_aircraft_cfg(package: Path) -> dict:
@@ -91,21 +102,19 @@ def extract_aircraft_cfg(package: Path) -> dict:
     cfg = read_cfg(cfg_path)
     result = {"source": str(cfg_path)}
 
-    # [GENERAL]
     if cfg.has_section("GENERAL"):
         for key in ["atc_type", "atc_model", "category", "icao_type_designator",
                      "icao_manufacturer", "icao_model"]:
-            result[key] = cfg.get("GENERAL", key, fallback=None)
+            result[key] = strip_quotes(cfg.get("GENERAL", key, fallback=None))
 
-    # [FLTSIM.N] sections — titles
     titles = []
     for section in cfg.sections():
         if section.upper().startswith("FLTSIM"):
-            title = cfg.get(section, "title", fallback=None)
+            title = strip_quotes(cfg.get(section, "title", fallback=None))
             if title:
                 titles.append(title)
             for key in ["ui_manufacturer", "ui_type", "ui_variation"]:
-                val = cfg.get(section, key, fallback=None)
+                val = strip_quotes(cfg.get(section, key, fallback=None))
                 if val and key not in result:
                     result[key] = val
     result["titles"] = titles
@@ -114,8 +123,11 @@ def extract_aircraft_cfg(package: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Engines CFG
+# Engines CFG (FIX-2: count ENGINE.N sections properly)
 # ---------------------------------------------------------------------------
+
+ENGINE_SECTION_RE = re.compile(r"^ENGINE\.(\d+)$", re.IGNORECASE)
+ENGINE_KEY_RE = re.compile(r"^Engine\.(\d+)$", re.IGNORECASE)
 
 def extract_engines_cfg(package: Path) -> dict:
     cfg_path = find_cfg(package, "engines.cfg")
@@ -125,27 +137,49 @@ def extract_engines_cfg(package: Path) -> dict:
     cfg = read_cfg(cfg_path)
     result = {"source": str(cfg_path)}
 
-    # [GENERALENGINEDATA]
     if cfg.has_section("GENERALENGINEDATA"):
         result["engine_type"] = cfg.getint("GENERALENGINEDATA", "engine_type", fallback=None)
 
-    # Count [ENGINE.N] sections
-    engine_count = 0
+    # Count engine sources:
+    # 1. [ENGINE.N] sections (piston aircraft)
+    engine_indices = set()
     for section in cfg.sections():
-        if section.upper().startswith("ENGINE"):
-            try:
-                num = int(section.split(".")[-1])
-                engine_count = max(engine_count, num)
-            except (ValueError, IndexError):
-                pass
-    result["engine_count"] = engine_count if engine_count > 0 else None
+        m = ENGINE_SECTION_RE.match(section)
+        if m:
+            engine_indices.add(int(m.group(1)))
+
+    # 2. Engine.N keys in [GENERALENGINEDATA] (jet/turboprop aircraft)
+    if cfg.has_section("GENERALENGINEDATA"):
+        for key, _ in cfg.items("GENERALENGINEDATA"):
+            m = ENGINE_KEY_RE.match(key)
+            if m:
+                engine_indices.add(int(m.group(1)))
+
+    if engine_indices:
+        result["engine_count"] = len(engine_indices)
+    else:
+        result["engine_count"] = None
 
     return result
 
 
 # ---------------------------------------------------------------------------
-# Systems CFG — autopilot
+# Systems CFG — autopilot (FIX-5: parse max_bank)
 # ---------------------------------------------------------------------------
+
+def parse_csv_numeric(val: str | None) -> list[float] | None:
+    """Parse a CSV string of numbers, return list of floats."""
+    if val is None:
+        return None
+    parts = [p.strip() for p in val.split(",") if p.strip()]
+    result = []
+    for p in parts:
+        try:
+            result.append(float(p))
+        except (ValueError, TypeError):
+            pass
+    return result if result else None
+
 
 def extract_systems_cfg(package: Path) -> dict:
     cfg_path = find_cfg(package, "systems.cfg")
@@ -158,12 +192,10 @@ def extract_systems_cfg(package: Path) -> dict:
     if cfg.has_section("AUTOPILOT"):
         ap = {}
         for key in ["autopilot_available", "flight_director_available",
-                     "autothrottle_available", "max_bank",
-                     "use_no_default_autopilot", "max_pitch",
-                     "max_vertical_speed", "min_vertical_speed"]:
+                     "autothrottle_available", "use_no_default_autopilot",
+                     "max_pitch", "max_vertical_speed", "min_vertical_speed"]:
             val = cfg.get("AUTOPILOT", key, fallback=None)
             if val is not None:
-                # Try numeric conversion
                 try:
                     val = float(val)
                     if val == int(val):
@@ -171,6 +203,16 @@ def extract_systems_cfg(package: Path) -> dict:
                 except (ValueError, TypeError):
                     pass
                 ap[key] = val
+
+        # FIX-5: max_bank as structured data
+        raw_bank = cfg.get("AUTOPILOT", "max_bank", fallback=None)
+        if raw_bank is not None:
+            bank_values = parse_csv_numeric(raw_bank)
+            ap["max_bank"] = {
+                "raw": raw_bank,
+                "values": bank_values,
+            }
+
         result["autopilot"] = ap
     else:
         result["autopilot"] = None
@@ -179,8 +221,11 @@ def extract_systems_cfg(package: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Flight model CFG — flaps
+# Flight model CFG — flaps (FIX-1: match only flaps-position.<N>)
 # ---------------------------------------------------------------------------
+
+FLAPS_POSITION_KEY_RE = re.compile(r"^flaps[\-_\.]?position[\-_\.]?(\d+)$", re.IGNORECASE)
+
 
 def extract_flight_model_cfg(package: Path) -> dict:
     cfg_path = find_cfg(package, "flight_model.cfg")
@@ -190,37 +235,50 @@ def extract_flight_model_cfg(package: Path) -> dict:
     cfg = read_cfg(cfg_path)
     result = {"source": str(cfg_path)}
 
-    flaps_sections = 0
-    flaps_positions = []
+    # Find all FLAPS sections
+    flaps_sections = []
     for section in cfg.sections():
         if section.upper().startswith("FLAPS"):
-            flaps_sections += 1
-            # Look for flaps-position.N keys
+            section_data = {"section": section, "positions": []}
             for key, val in cfg.items(section):
-                if "flaps-position" in key.lower() or "position" in key.lower():
-                    try:
-                        flaps_positions.append(float(val))
-                    except (ValueError, TypeError):
-                        pass
+                m = FLAPS_POSITION_KEY_RE.match(key)
+                if m:
+                    idx = int(m.group(1))
+                    # Parse CSV: first component = angle_deg
+                    angle_deg = None
+                    parts = [p.strip() for p in val.split(",") if p.strip()]
+                    if parts:
+                        try:
+                            angle_deg = float(parts[0])
+                        except (ValueError, TypeError):
+                            pass
+                    section_data["positions"].append({
+                        "index": idx,
+                        "angle_deg": angle_deg,
+                        "raw": val,
+                    })
+            # Sort positions by index
+            section_data["positions"].sort(key=lambda x: x["index"])
+            flaps_sections.append(section_data)
 
-    result["flaps_sections"] = flaps_sections
-    result["flaps_positions"] = sorted(set(flaps_positions)) if flaps_positions else []
+    result["flaps"] = {
+        "sections": flaps_sections,
+        "total_positions": sum(len(s["positions"]) for s in flaps_sections),
+    }
+
+    if cfg_path and not flaps_sections:
+        result["flaps"]["note"] = "No flaps-position.N keys found in flight_model.cfg"
 
     return result
 
 
 # ---------------------------------------------------------------------------
-# Var scanning (L/H/B vars)
+# Var scanning (unchanged)
 # ---------------------------------------------------------------------------
 
-VAR_PATTERN = re.compile(r"\((L:[^),\s]+)\)|\(H:[^),\s]+\)\)|\(B:[^),\s]+\)")
-
-
 def scan_vars_in_file(filepath: Path) -> tuple[set, set, set]:
-    """Scan a single file for L/H/B vars."""
     lvars, hvars, bvars = set(), set(), set()
     try:
-        # Skip files > 20MB
         if filepath.stat().st_size > 20 * 1024 * 1024:
             return lvars, hvars, bvars
         content = filepath.read_text(encoding="utf-8", errors="replace")
@@ -236,7 +294,6 @@ def scan_vars_in_file(filepath: Path) -> tuple[set, set, set]:
 
 
 def scan_package_vars(package: Path) -> dict:
-    """Scan model/*.xml, panel/*, html_ui/* for vars."""
     all_lvars, all_hvars, all_bvars = set(), set(), set()
     custom_logic = False
 
@@ -248,7 +305,6 @@ def scan_package_vars(package: Path) -> dict:
         if not variant_dir.is_dir():
             continue
 
-        # Scan model/*.xml
         model_dir = variant_dir / "model"
         if model_dir.exists():
             for xml_file in model_dir.glob("*.xml"):
@@ -257,7 +313,6 @@ def scan_package_vars(package: Path) -> dict:
                 all_hvars |= hv
                 all_bvars |= bv
 
-        # Scan panel/*.xml, panel/*.html
         panel_dir = variant_dir / "panel"
         if panel_dir.exists():
             for f in panel_dir.glob("*.*"):
@@ -267,7 +322,6 @@ def scan_package_vars(package: Path) -> dict:
                     all_hvars |= hv
                     all_bvars |= bv
 
-        # Scan html_ui/* for custom JS
         html_ui_dir = variant_dir / "html_ui"
         if html_ui_dir.exists():
             custom_logic = True
@@ -286,7 +340,7 @@ def scan_package_vars(package: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Detect channel (Steam vs MS Store)
+# Detect channel
 # ---------------------------------------------------------------------------
 
 def detect_channel(usercfg_path: Path) -> str:
@@ -296,7 +350,6 @@ def detect_channel(usercfg_path: Path) -> str:
             return "steam"
     except Exception:
         pass
-    # Check parent dirs
     if "Steam" in str(usercfg_path):
         return "steam"
     return "msstore"
@@ -307,7 +360,6 @@ def detect_channel(usercfg_path: Path) -> str:
 # ---------------------------------------------------------------------------
 
 def main():
-    # Step 0: Locate installation
     steam_cfg = Path.home() / "AppData" / "Roaming" / "Microsoft Flight Simulator" / "UserCfg.opt"
     msstore_cfg = Path.home() / "AppData" / "Local" / "Packages" / "Microsoft.FlightSimulator_8wekyb3d8bbwe" / "LocalCache" / "UserCfg.opt"
 
@@ -317,17 +369,14 @@ def main():
     elif msstore_cfg.exists():
         usercfg = msstore_cfg
     else:
-        # Try known path
         known = Path(r"R:\GAMES\Official\Steam")
         if known.exists():
-            # Derive UserCfg from known path
             usercfg = Path(r"C:\Users\MYRIG\AppData\Roaming\Microsoft Flight Simulator\UserCfg.opt")
 
     if not usercfg or not usercfg.exists():
         print("ERROR: UserCfg.opt not found", file=sys.stderr)
         sys.exit(1)
 
-    # Read InstalledPackagesPath
     installed_path = None
     try:
         for line in usercfg.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -350,7 +399,6 @@ def main():
         print(f"ERROR: Official dir not found: {official_dir}", file=sys.stderr)
         sys.exit(1)
 
-    # Step 1: Find aircraft packages
     aircraft_packages = []
     for d in sorted(official_dir.iterdir()):
         if d.is_dir() and (d.name.startswith("asobo-aircraft-") or d.name.startswith("microsoft-aircraft-")):
@@ -358,7 +406,6 @@ def main():
 
     print(f"Found {len(aircraft_packages)} aircraft packages in {official_dir}")
 
-    # Get game version
     game_version = None
     fs_base = official_dir / "fs-base"
     if fs_base.exists():
@@ -366,10 +413,12 @@ def main():
         if manifest:
             game_version = manifest.get("package_version")
 
-    # Step 2: Extract per package
+    # Counters
     packages_data = []
-    total_variants = 0
-    total_titles = 0
+    aircraft_variants = 0
+    aircraft_titles = 0
+    livery_packages = 0
+    aircraft_packages_count = 0
     readable_count = 0
     unreadable_count = 0
 
@@ -378,23 +427,24 @@ def main():
         pkg_data = {
             "package": pkg.name,
             "readable": True,
+            "is_livery": False,
             "manifest": None,
             "variants": [],
             "errors": [],
         }
 
-        # Manifest
         manifest = extract_manifest(pkg)
         if manifest:
+            content_type = manifest.get("content_type", "")
+            pkg_data["is_livery"] = content_type == "LIVERY"
             pkg_data["manifest"] = {
                 "creator": manifest.get("creator"),
                 "title": manifest.get("title"),
                 "package_version": manifest.get("package_version"),
                 "minimum_game_version": manifest.get("minimum_game_version"),
-                "content_type": manifest.get("content_type"),
+                "content_type": content_type,
             }
 
-        # Check for SimObjects
         simobjects = pkg / "SimObjects" / "Airplanes"
         if not simobjects.exists():
             pkg_data["errors"].append("No SimObjects/Airplanes directory")
@@ -403,7 +453,6 @@ def main():
             packages_data.append(pkg_data)
             continue
 
-        # Check for .fsarchive (encrypted)
         for f in pkg.rglob("*.fsarchive"):
             pkg_data["errors"].append(f"Encrypted archive: {f.name}")
             pkg_data["readable"] = False
@@ -415,8 +464,11 @@ def main():
             continue
 
         readable_count += 1
+        if pkg_data["is_livery"]:
+            livery_packages += 1
+        else:
+            aircraft_packages_count += 1
 
-        # Process each variant
         for variant_dir in sorted(simobjects.iterdir()):
             if not variant_dir.is_dir():
                 continue
@@ -441,7 +493,6 @@ def main():
                 "source_paths": {},
             }
 
-            # Aircraft CFG
             ac_cfg = extract_aircraft_cfg(pkg)
             variant_data["source_paths"]["aircraft_cfg"] = ac_cfg.get("source")
             variant_data["titles"] = ac_cfg.get("titles", [])
@@ -452,26 +503,19 @@ def main():
             variant_data["ui_manufacturer"] = ac_cfg.get("ui_manufacturer")
             variant_data["ui_type"] = ac_cfg.get("ui_type")
 
-            # Engines CFG
             en_cfg = extract_engines_cfg(pkg)
             variant_data["source_paths"]["engines_cfg"] = en_cfg.get("source")
             variant_data["engine_type"] = en_cfg.get("engine_type")
             variant_data["engine_count"] = en_cfg.get("engine_count")
 
-            # Systems CFG
             sys_cfg = extract_systems_cfg(pkg)
             variant_data["source_paths"]["systems_cfg"] = sys_cfg.get("source")
             variant_data["autopilot"] = sys_cfg.get("autopilot")
 
-            # Flight model CFG
             fm_cfg = extract_flight_model_cfg(pkg)
             variant_data["source_paths"]["flight_model_cfg"] = fm_cfg.get("source")
-            variant_data["flaps"] = {
-                "sections": fm_cfg.get("flaps_sections"),
-                "positions": fm_cfg.get("flaps_positions"),
-            }
+            variant_data["flaps"] = fm_cfg.get("flaps")
 
-            # Vars scan (per variant)
             vars_data = scan_package_vars(pkg)
             variant_data["lvars"] = vars_data["lvars"]
             variant_data["hvars"] = vars_data["hvars"]
@@ -479,12 +523,13 @@ def main():
             variant_data["custom_logic"] = vars_data["custom_logic"]
 
             pkg_data["variants"].append(variant_data)
-            total_variants += 1
-            total_titles += len(variant_data["titles"])
+
+            if not pkg_data["is_livery"]:
+                aircraft_variants += 1
+                aircraft_titles += len(variant_data["titles"])
 
         packages_data.append(pkg_data)
 
-    # Step 3: Build output
     output = {
         "meta": {
             "sim": "MSFS 2020",
@@ -495,25 +540,25 @@ def main():
             "extracted_at": datetime.now(timezone.utc).isoformat(),
             "script": "TASKS/TOOLS/extract_msfs2020_default_aircraft.py",
             "total_packages": len(aircraft_packages),
+            "aircraft_packages": aircraft_packages_count,
+            "livery_packages": livery_packages,
             "readable_packages": readable_count,
             "unreadable_packages": unreadable_count,
-            "total_variants": total_variants,
-            "total_titles": total_titles,
+            "aircraft_variants": aircraft_variants,
+            "aircraft_titles": aircraft_titles,
         },
         "packages": packages_data,
     }
 
-    # Write JSON
     output_path = Path("TASKS/DATA/msfs2020_default_aircraft_dataset.json")
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(output, f, indent=2, ensure_ascii=False)
 
     print(f"\nDataset written to: {output_path}")
-    print(f"Total packages: {len(aircraft_packages)}")
+    print(f"Total packages: {len(aircraft_packages)} (aircraft: {aircraft_packages_count}, liveries: {livery_packages})")
     print(f"Readable: {readable_count}, Unreadable: {unreadable_count}")
-    print(f"Total variants: {total_variants}")
-    print(f"Total titles: {total_titles}")
+    print(f"Aircraft variants: {aircraft_variants}, Aircraft titles: {aircraft_titles}")
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@ class CommandSource(Enum):
     EXTERNAL = "external"
     SAFETY = "safety"
 
-_SOURCE = ContextVar("autoland_command_source", default=CommandSource.AIRCRAFT_AP)
+_SOURCE = ContextVar("autoland_command_source", default=None)
 
 class CommandRejected(RuntimeError):
     pass
@@ -33,6 +33,8 @@ class CommandGateway:
     def __init__(self, control, ownership_provider):
         self._control = control
         self._ownership_provider = ownership_provider
+        self._warned_methods: set[str] = set()
+        self._unscoped_methods: set[str] = set()
 
     @contextmanager
     def source_scope(self, source: CommandSource):
@@ -51,6 +53,18 @@ class CommandGateway:
 
     def _authorize(self, name: str):
         source = _SOURCE.get()
+        if source is None:
+            # Stage 1: unscoped call — treat as AIRCRAFT_AP (contract-preserving)
+            # but emit a rate-limited warning
+            self._unscoped_methods.add(name)
+            if name not in self._warned_methods:
+                self._warned_methods.add(name)
+                logger.warning(
+                    "Unscoped command '%s' using implicit AIRCRAFT_AP default — "
+                    "will become fail-closed in Stage 2",
+                    name,
+                )
+            source = CommandSource.AIRCRAFT_AP
         if source == CommandSource.SAFETY:
             return
         actual = ControlOwner.AIRCRAFT_AP if source == CommandSource.AIRCRAFT_AP else ControlOwner.EXTERNAL
@@ -61,6 +75,9 @@ class CommandGateway:
             raise CommandRejected(message)
 
     def __getattr__(self, name):
+        # Intercept known attributes before delegating to _control
+        if name == "unscoped_call_names":
+            return frozenset(self._unscoped_methods)
         target = getattr(self._control, name)
         if name not in self._CHANNELS or not callable(target):
             return target

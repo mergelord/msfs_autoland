@@ -4,10 +4,21 @@
 """
 
 import logging
+import math
+import time
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+
+def _is_valid_number(value) -> bool:
+    """Check if value is a finite numeric type (not bool)."""
+    return (
+        isinstance(value, (int, float))
+        and not isinstance(value, bool)
+        and math.isfinite(value)
+    )
 
 
 @dataclass
@@ -43,8 +54,10 @@ class EngineFailureThresholds:
 class EngineFailureDetector:
     """Детектор отказов двигателей"""
 
-    def __init__(self, thresholds: Optional[EngineFailureThresholds] = None):
+    def __init__(self, thresholds: Optional[EngineFailureThresholds] = None,
+                 *, clock: Optional[Callable[[], float]] = None):
         self.thresholds = thresholds or EngineFailureThresholds()
+        self._clock = clock or time.monotonic
 
         # Состояние двигателей
         self.engines: Dict[int, EngineState] = {}
@@ -56,6 +69,9 @@ class EngineFailureDetector:
         # Статистика
         self.total_failures_detected: int = 0
         self.active_failures: List[int] = []  # Индексы отказавших двигателей
+
+        # Rate-limited warning tracking for invalid telemetry
+        self._warned_fields: set[Tuple[int, str]] = set()
 
     def initialize(self, number_of_engines: int):
         """
@@ -111,17 +127,50 @@ class EngineFailureDetector:
         engine = self.engines[engine_idx]
 
         # Чтение данных из телеметрии
-        # TODO: Добавить реальное чтение из SimConnect
-        # Сейчас используем заглушки
         engine_data = telemetry.get('engines', {}).get(f'engine_{engine_idx}', {})
 
-        engine.running = engine_data.get('running', True)
-        engine.n1 = engine_data.get('n1', 0.0)
-        engine.n2 = engine_data.get('n2', 0.0)
-        engine.egt = engine_data.get('egt', 0.0)
-        engine.fuel_flow = engine_data.get('fuel_flow', 0.0)
-        engine.oil_pressure = engine_data.get('oil_pressure', 0.0)
-        engine.throttle_position = engine_data.get('throttle', 0.0)
+        # H2: Validate all required numeric fields and running flag
+        numeric_fields = {
+            'n1': engine_data.get('n1', 0.0),
+            'n2': engine_data.get('n2', 0.0),
+            'egt': engine_data.get('egt', 0.0),
+            'fuel_flow': engine_data.get('fuel_flow', 0.0),
+            'oil_pressure': engine_data.get('oil_pressure', 0.0),
+            'throttle': engine_data.get('throttle', 0.0),
+        }
+        running_raw = engine_data.get('running', True)
+
+        # Validate running must be a real bool
+        if not isinstance(running_raw, bool):
+            warn_key = (engine_idx, 'running')
+            if warn_key not in self._warned_fields:
+                self._warned_fields.add(warn_key)
+                logger.warning(
+                    f"Engine {engine_idx}: invalid telemetry field "
+                    f"'running'={running_raw!r} — preserving previous state"
+                )
+            return
+
+        # Validate all numeric fields
+        for field, value in numeric_fields.items():
+            if not _is_valid_number(value):
+                warn_key = (engine_idx, field)
+                if warn_key not in self._warned_fields:
+                    self._warned_fields.add(warn_key)
+                    logger.warning(
+                        f"Engine {engine_idx}: invalid telemetry field "
+                        f"'{field}'={value!r} — preserving previous state"
+                    )
+                return
+
+        # All fields valid — apply and check failure
+        engine.running = running_raw
+        engine.n1 = numeric_fields['n1']
+        engine.n2 = numeric_fields['n2']
+        engine.egt = numeric_fields['egt']
+        engine.fuel_flow = numeric_fields['fuel_flow']
+        engine.oil_pressure = numeric_fields['oil_pressure']
+        engine.throttle_position = numeric_fields['throttle']
 
         # Проверка на отказ
         self._check_engine_failure(engine)
@@ -133,8 +182,6 @@ class EngineFailureDetector:
         Args:
             engine: Состояние двигателя
         """
-        import time
-
         failure_detected = False
         failure_reason = None
 
@@ -169,7 +216,7 @@ class EngineFailureDetector:
             failure_reason = f"Low oil pressure: {engine.oil_pressure:.1f} PSI"
 
         # Подтверждение отказа (защита от ложных срабатываний)
-        current_time = time.time()
+        current_time = self._clock()
 
         if failure_detected:
             # Добавляем в историю
@@ -273,6 +320,13 @@ class EngineFailureDetector:
         # Отказавшие двигатели - 0% тяги
         for engine_idx in failed_engines:
             corrections[f'engine_{engine_idx}'] = 0.0
+
+        # H5: All engines failed — no working engine for compensation
+        if not working_engines:
+            logger.critical(
+                "ALL ENGINES FAILED — no working engine for asymmetric compensation"
+            )
+            return corrections
 
         # Работающие двигатели - компенсация
         # Увеличиваем тягу на работающих двигателях пропорционально

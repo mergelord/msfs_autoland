@@ -32,7 +32,7 @@ class AutothrottleConfig:
     target_speed_tolerance: float = 5.0  # Допустимое отклонение скорости (узлы)
 
     # Коррекция на конфигурацию
-    flaps_drag_factor: float = 0.15  # Дополнительная тяга на каждую позицию закрылков
+    flaps_drag_full_deployment: float = 0.6  # Доп. тяга при ПОЛНОМ выпуске закрылков (калибровка = старое 4×0.15)
     gear_drag_factor: float = 0.10  # Дополнительная тяга при выпущенном шасси
 
     # Коррекция на вес
@@ -95,14 +95,14 @@ class AutothrottleController(Controller):
 
     def calculate_base_throttle(self,
                                 aircraft_weight: float,
-                                flaps_position: int,
+                                flaps_fraction: float,
                                 gear_down: bool) -> float:
         """
         Расчёт базовой тяги с учётом веса и конфигурации
 
         Args:
             aircraft_weight: Вес самолёта (фунты)
-            flaps_position: Позиция закрылков (0-4)
+            flaps_fraction: Доля выпуска закрылков (0.0-1.0, FLAPS HANDLE PERCENT)
             gear_down: Шасси выпущено
 
         Returns:
@@ -116,7 +116,8 @@ class AutothrottleController(Controller):
         base_throttle += weight_correction
 
         # Коррекция на закрылки (больше закрылки = больше сопротивление = больше тяга)
-        flaps_correction = flaps_position * self.config.flaps_drag_factor
+        flaps_fraction = max(0.0, min(1.0, flaps_fraction))
+        flaps_correction = flaps_fraction * self.config.flaps_drag_full_deployment
         base_throttle += flaps_correction
 
         # Коррекция на шасси
@@ -127,7 +128,7 @@ class AutothrottleController(Controller):
         base_throttle = max(self.config.min_throttle, min(self.config.max_throttle, base_throttle))
 
         logger.debug(f"Base throttle: {base_throttle:.3f} "
-                    f"(weight: {aircraft_weight:.0f}lbs, flaps: {flaps_position}, gear: {gear_down})")
+                    f"(weight: {aircraft_weight:.0f}lbs, flaps: {flaps_fraction:.2f}, gear: {gear_down})")
 
         return base_throttle
 
@@ -278,11 +279,10 @@ class AutothrottleController(Controller):
             }
 
         # Конфигурация самолёта - читаем из SimConnect
-        # FLAPS_HANDLE_PERCENT возвращает 0.0-1.0, конвертируем в позицию 0-4
+        # FLAPS_HANDLE_PERCENT возвращает 0.0-1.0 (доля выпуска)
         # GEAR_POSITION возвращает 0.0-1.0 (1.0 = полностью выпущено)
         config_data = telemetry.get('configuration', {})
-        flaps_handle_percent = config_data.get('flaps_position', 1.0)  # 0.0-1.0
-        flaps_position = int(round(flaps_handle_percent * 4))  # 0-4
+        flaps_fraction = config_data.get('flaps_position', 1.0)  # 0.0-1.0
         gear_down = config_data.get('gear_position', 1.0) > 0.5
 
         # Временной шаг
@@ -304,7 +304,7 @@ class AutothrottleController(Controller):
         self.previous_time = current_time
 
         # 1. Базовая тяга (вес + конфигурация)
-        base_throttle = self.calculate_base_throttle(aircraft_weight, flaps_position, gear_down)
+        base_throttle = self.calculate_base_throttle(aircraft_weight, flaps_fraction, gear_down)
 
         # 2. Коррекция на ветер (встречный + боковой)
         headwind = wind_data.get('headwind', 0)

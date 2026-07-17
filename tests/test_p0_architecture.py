@@ -25,10 +25,10 @@ def test_safety_override_scoped():
     with pytest.raises(CommandRejected): gateway.set_throttle(1.0)
 
 @pytest.mark.parametrize("method,value,event_name,expected",[
-    ("set_throttle",2,"THROTTLE_SET",16384),
+    ("set_throttle",2,"THROTTLE_SET",16383),   # A-CONF-2: clamp to SDK max
     ("set_throttle",-1,"THROTTLE_SET",0),
-    ("set_rudder",2,"RUDDER_SET",16384),
-    ("set_aileron",-2,"AILERON_SET",-16384),
+    ("set_rudder",2,"RUDDER_SET",16383),       # A-CONF-3: clamp to SDK max
+    ("set_aileron",-2,"AILERON_SET",-16383),    # A-CONF-3: clamp to SDK min
 ])
 def test_clamps(method,value,event_name,expected):
     ae=_make_ae_with_catalog([event_name])

@@ -19,6 +19,8 @@ SDK_ONLY_EVENTS = frozenset({
     "NAV2_RADIO_SET_HZ",
 })
 
+AXIS_ABS_MAX = 16383  # SDK limit for *_SET axis events
+
 
 class MSFSControl:
     """Класс для управления самолётом через SimConnect"""
@@ -231,7 +233,7 @@ class MSFSControl:
         """
         try:
             percent = self._throttle_input(percent)
-            value = int(percent * 16384)
+            value = min(AXIS_ABS_MAX, int(percent * 16384))
             self._send_event("THROTTLE_SET", value)
             logger.info("Throttle set: %.1f%%", percent*100)
         except Exception as e:
@@ -247,7 +249,7 @@ class MSFSControl:
         """
         try:
             percent = self._throttle_input(percent, name=f"engine_{engine_index}_throttle")
-            value = int(percent * 16384)
+            value = min(AXIS_ABS_MAX, int(percent * 16384))
 
             # SimConnect события для индивидуальных двигателей
             event_map = {
@@ -297,7 +299,7 @@ class MSFSControl:
         try:
             # SimConnect использует диапазон -16384 до +16384
             percent = self._unit_input(percent, name="rudder")
-            value = int(percent * 16384)
+            value = max(-AXIS_ABS_MAX, min(AXIS_ABS_MAX, int(percent * 16384)))
             self._send_event("RUDDER_SET", value)
             logger.debug(f"Rudder set: {percent:+.2f} ({value})")
 
@@ -317,7 +319,7 @@ class MSFSControl:
         try:
             # SimConnect использует диапазон -16384 до +16384
             percent = self._unit_input(percent, name="aileron")
-            value = int(percent * 16384)
+            value = max(-AXIS_ABS_MAX, min(AXIS_ABS_MAX, int(percent * 16384)))
             self._send_event("AILERON_SET", value)
             logger.debug(f"Aileron set: {percent:+.2f} ({value})")
 

@@ -7,16 +7,69 @@ import logging
 from typing import Optional
 
 from SimConnect import AircraftEvents
+from SimConnect.EventList import Event
 
 logger = logging.getLogger(__name__)
+
+# SDK-only events absent from SimConnect v0.4.26 static EventList
+# but confirmed in official MSFS 2020 SDK.
+SDK_ONLY_EVENTS = frozenset({
+    "AP_VS_ON",
+    "NAV1_RADIO_SET_HZ",
+    "NAV2_RADIO_SET_HZ",
+})
 
 
 class MSFSControl:
     """Класс для управления самолётом через SimConnect"""
 
+    FLAPS_EVENTS = {
+        0: "FLAPS_UP",
+        1: "FLAPS_1",
+        2: "FLAPS_2",
+        3: "FLAPS_3",
+    }
+
     def __init__(self, aircraft_events: AircraftEvents, aircraft_requests=None):
         self.ae = aircraft_events
         self._aq = aircraft_requests  # Optional: для readback SimVars
+        self._dynamic_events: dict[str, Event] = {}
+
+    # ── SimConnect event dispatch (A-DISP-1) ─────────────────────
+
+    def _resolve_event(self, name: str):
+        event = self.ae.find(name)
+        if event is not None:
+            if not callable(event):
+                raise TypeError(f"SimConnect event {name!r} is not callable")
+            return event
+
+        if name not in SDK_ONLY_EVENTS:
+            raise ValueError(f"Unknown SimConnect event: {name}")
+
+        event = self._dynamic_events.get(name)
+        if event is None:
+            sm = getattr(self.ae, "sm", None)
+            if sm is None:
+                raise RuntimeError(
+                    f"Cannot register SDK-only event {name!r}: "
+                    "AircraftEvents.sm unavailable"
+                )
+            event = Event(
+                name.encode("ascii"), sm,
+                _dec="Official MSFS SDK event missing from SimConnect 0.4.26 EventList",
+            )
+            self._dynamic_events[name] = event
+        return event
+
+    def _send_event(self, name: str, value=None):
+        event = self._resolve_event(name)
+        if value is None:
+            event()
+        else:
+            event(value)
+
+    # ── Helpers ──────────────────────────────────────────────────
 
     @staticmethod
     def _bounded_number(value, *, name, minimum, maximum):
@@ -41,13 +94,15 @@ class MSFSControl:
     def _throttle_input(cls, value, *, name="throttle"):
         return cls._bounded_number(value, name=name, minimum=0.0, maximum=1.0)
 
+    # ── Commands ─────────────────────────────────────────────────
+
     def set_autopilot_master(self, state: bool):
         """Включить/выключить автопилот"""
         try:
             if state:
-                self.ae.event("AUTOPILOT_ON")
+                self._send_event("AUTOPILOT_ON")
             else:
-                self.ae.event("AUTOPILOT_OFF")
+                self._send_event("AUTOPILOT_OFF")
             logger.info("Autopilot master: %s", state)
         except Exception as e:
             logger.error("Error setting autopilot master: %s", e)
@@ -55,9 +110,9 @@ class MSFSControl:
     def set_heading_hold(self, heading: Optional[int] = None):
         """Установить режим удержания курса"""
         try:
-            self.ae.event("AP_HDG_HOLD_ON")
+            self._send_event("AP_HDG_HOLD_ON")
             if heading is not None:
-                self.ae.event("HEADING_BUG_SET", int(heading))
+                self._send_event("HEADING_BUG_SET", int(heading))
             logger.info("Heading hold ON, heading: %s", heading)
         except Exception as e:
             logger.error("Error setting heading hold: %s", e)
@@ -65,9 +120,9 @@ class MSFSControl:
     def set_altitude_hold(self, altitude: Optional[int] = None):
         """Установить режим удержания высоты"""
         try:
-            self.ae.event("AP_ALT_HOLD_ON")
+            self._send_event("AP_ALT_HOLD_ON")
             if altitude is not None:
-                self.ae.event("AP_ALT_VAR_SET_ENGLISH", int(altitude))
+                self._send_event("AP_ALT_VAR_SET_ENGLISH", int(altitude))
             logger.info("Altitude hold ON, altitude: %s", altitude)
         except Exception as e:
             logger.error("Error setting altitude hold: %s", e)
@@ -76,9 +131,9 @@ class MSFSControl:
         """Включить/выключить режим NAV (следование по VOR)"""
         try:
             if state:
-                self.ae.event("AP_NAV1_HOLD_ON")
+                self._send_event("AP_NAV1_HOLD_ON")
             else:
-                self.ae.event("AP_NAV1_HOLD_OFF")
+                self._send_event("AP_NAV1_HOLD_OFF")
             logger.info("NAV hold: %s", state)
         except Exception as e:
             logger.error("Error setting NAV hold: %s", e)
@@ -87,9 +142,9 @@ class MSFSControl:
         """Включить/выключить режим захода на посадку"""
         try:
             if state:
-                self.ae.event("AP_APR_HOLD_ON")
+                self._send_event("AP_APR_HOLD_ON")
             else:
-                self.ae.event("AP_APR_HOLD_OFF")
+                self._send_event("AP_APR_HOLD_OFF")
             logger.info("Approach mode: %s", state)
         except Exception as e:
             logger.error("Error setting approach mode: %s", e)
@@ -97,18 +152,21 @@ class MSFSControl:
     def set_airspeed_hold(self, speed: Optional[int] = None):
         """Установить режим удержания скорости"""
         try:
-            self.ae.event("AP_AIRSPEED_ON")
+            self._send_event("AP_AIRSPEED_ON")
             if speed is not None:
-                self.ae.event("AP_SPD_VAR_SET", int(speed))
+                self._send_event("AP_SPD_VAR_SET", int(speed))
             logger.info("Airspeed hold ON, speed: %s", speed)
         except Exception as e:
             logger.error("Error setting airspeed hold: %s", e)
 
     def set_vertical_speed(self, vs: int):
-        """Установить вертикальную скорость (футы/мин)"""
+        """Установить вертикальную скорость (футы/мин)
+
+        Uses deterministic AP_VS_ON (not toggle AP_VS_HOLD).
+        """
         try:
-            self.ae.event("AP_VS_HOLD")
-            self.ae.event("AP_VS_VAR_SET_ENGLISH", int(vs))
+            self._send_event("AP_VS_ON")
+            self._send_event("AP_VS_VAR_SET_ENGLISH", int(vs))
             logger.info("Vertical speed set: %s fpm", vs)
         except Exception as e:
             logger.error("Error setting vertical speed: %s", e)
@@ -117,9 +175,9 @@ class MSFSControl:
         """Установить частоту NAV радио (в Hz)"""
         try:
             if nav_index == 1:
-                self.ae.event("NAV1_RADIO_SET_HZ", frequency)
+                self._send_event("NAV1_RADIO_SET_HZ", frequency)
             elif nav_index == 2:
-                self.ae.event("NAV2_RADIO_SET_HZ", frequency)
+                self._send_event("NAV2_RADIO_SET_HZ", frequency)
             logger.info("NAV%s frequency set: %s Hz", nav_index, frequency)
         except Exception as e:
             logger.error("Error setting NAV frequency: %s", e)
@@ -127,7 +185,7 @@ class MSFSControl:
     def set_adf_frequency(self, frequency: int):
         """Установить частоту ADF (в Hz)"""
         try:
-            self.ae.event("ADF_COMPLETE_SET", frequency)
+            self._send_event("ADF_COMPLETE_SET", frequency)
             logger.info("ADF frequency set: %s Hz", frequency)
         except Exception as e:
             logger.error("Error setting ADF frequency: %s", e)
@@ -136,19 +194,20 @@ class MSFSControl:
         """Установить OBS (курс на VOR)"""
         try:
             if nav_index == 1:
-                self.ae.event("VOR1_SET", int(course))
+                self._send_event("VOR1_SET", int(course))
             elif nav_index == 2:
-                self.ae.event("VOR2_SET", int(course))
+                self._send_event("VOR2_SET", int(course))
             logger.info("NAV%s OBS set: %s°", nav_index, course)
         except Exception as e:
             logger.error("Error setting OBS: %s", e)
 
     def set_flaps(self, position: int):
-        """Установить закрылки (0-3)"""
+        """Установить закрылки (логический детент 0-3 через дискретные события)"""
         try:
             position = int(self._bounded_number(position, name="flaps", minimum=0, maximum=3))
-            self.ae.event("FLAPS_SET", position)
-            logger.info("Flaps set: %s", position)
+            event_name = self.FLAPS_EVENTS[position]
+            self._send_event(event_name)
+            logger.info("Flaps set: %s (%s)", position, event_name)
         except Exception as e:
             logger.error("Error setting flaps: %s", e)
 
@@ -156,9 +215,9 @@ class MSFSControl:
         """Выпустить/убрать шасси"""
         try:
             if state:
-                self.ae.event("GEAR_DOWN")
+                self._send_event("GEAR_DOWN")
             else:
-                self.ae.event("GEAR_UP")
+                self._send_event("GEAR_UP")
             logger.info("Gear: %s", 'DOWN' if state else 'UP')
         except Exception as e:
             logger.error("Error setting gear: %s", e)
@@ -173,7 +232,7 @@ class MSFSControl:
         try:
             percent = self._throttle_input(percent)
             value = int(percent * 16384)
-            self.ae.event("THROTTLE_SET", value)
+            self._send_event("THROTTLE_SET", value)
             logger.info("Throttle set: %.1f%%", percent*100)
         except Exception as e:
             logger.error("Error setting throttle: %s", e)
@@ -202,7 +261,7 @@ class MSFSControl:
                 logger.error(f"Invalid engine index: {engine_index} (must be 1-4)")
                 return
 
-            self.ae.event(event_map[engine_index], value)
+            self._send_event(event_map[engine_index], value)
             logger.info(f"Engine {engine_index} throttle set: {percent*100:.1f}%")
 
         except Exception as e:
@@ -239,7 +298,7 @@ class MSFSControl:
             # SimConnect использует диапазон -16384 до +16384
             percent = self._unit_input(percent, name="rudder")
             value = int(percent * 16384)
-            self.ae.event("RUDDER_SET", value)
+            self._send_event("RUDDER_SET", value)
             logger.debug(f"Rudder set: {percent:+.2f} ({value})")
 
         except Exception as e:
@@ -259,7 +318,7 @@ class MSFSControl:
             # SimConnect использует диапазон -16384 до +16384
             percent = self._unit_input(percent, name="aileron")
             value = int(percent * 16384)
-            self.ae.event("AILERON_SET", value)
+            self._send_event("AILERON_SET", value)
             logger.debug(f"Aileron set: {percent:+.2f} ({value})")
 
         except Exception as e:

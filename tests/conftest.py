@@ -15,6 +15,25 @@ for _mod in ('SimConnect', 'pyvjoy', 'pyvjoy._sdk'):
     if _mod not in sys.modules:
         sys.modules[_mod] = MagicMock()
 
+# Ensure SimConnect.EventList is importable with a real Event class for
+# MSFSControl._resolve_event SDK-only fallback.
+if 'SimConnect.EventList' not in sys.modules:
+    import types as _types
+    _ev_list = _types.ModuleType('SimConnect.EventList')
+
+    class _FakeSimConnectEvent:
+        """Minimal stand-in for SimConnect.EventList.Event in tests."""
+        def __init__(self, _deff, _sm, _dec=''):
+            self.deff = _deff
+            self.sm = _sm
+            self.event = None
+        def __call__(self, value=0):
+            pass
+
+    _ev_list.Event = _FakeSimConnectEvent
+    sys.modules['SimConnect'].EventList = _ev_list
+    sys.modules['SimConnect.EventList'] = _ev_list
+
 import pytest
 from tests.fakes import FakeAircraftAdapter, FakeClock, FakeControl, FakeVJoy
 

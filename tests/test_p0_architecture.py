@@ -5,9 +5,9 @@ from modules.connection_optimizer import ConnectionOptimizer
 from modules.control import MSFSControl
 from modules.control_ownership import ControlOwner, ControlOwnership
 
-class FakeEvents:
-    def __init__(self): self.calls=[]
-    def event(self,name,*args): self.calls.append((name,*args))
+from tests.test_p0_aconf1_aconf4_bat1 import FakeAircraftEvents, _make_ae_with_catalog
+
+
 class FakeControl:
     def __init__(self): self.calls=[]
     def set_throttle(self,v): self.calls.append(("set_throttle",v))
@@ -23,12 +23,26 @@ def test_safety_override_scoped():
     raw=FakeControl(); gateway=CommandGateway(raw,external)
     with gateway.source_scope(CommandSource.SAFETY): gateway.set_throttle(1.0); gateway.set_vertical_speed(1500)
     with pytest.raises(CommandRejected): gateway.set_throttle(1.0)
-@pytest.mark.parametrize("method,value,event,expected",[("set_throttle",2,"THROTTLE_SET",16384),("set_throttle",-1,"THROTTLE_SET",0),("set_rudder",2,"RUDDER_SET",16384),("set_aileron",-2,"AILERON_SET",-16384)])
-def test_clamps(method,value,event,expected):
-    ae=FakeEvents(); getattr(MSFSControl(ae),method)(value); assert ae.calls[-1]==(event,expected)
+
+@pytest.mark.parametrize("method,value,event_name,expected",[
+    ("set_throttle",2,"THROTTLE_SET",16384),
+    ("set_throttle",-1,"THROTTLE_SET",0),
+    ("set_rudder",2,"RUDDER_SET",16384),
+    ("set_aileron",-2,"AILERON_SET",-16384),
+])
+def test_clamps(method,value,event_name,expected):
+    ae=_make_ae_with_catalog([event_name])
+    ctrl=MSFSControl(ae)
+    getattr(ctrl,method)(value)
+    assert ae._catalog[event_name].calls==[expected]
+
 @pytest.mark.parametrize("bad",[None,float("nan"),float("inf"),-float("inf")])
 def test_non_finite_rejected(bad):
-    ae=FakeEvents(); MSFSControl(ae).set_throttle(bad); assert not ae.calls
+    ae=FakeAircraftEvents({})
+    MSFSControl(ae).set_throttle(bad)
+    # No event should have been resolved
+    assert ae.find_calls==[]
+
 class Telemetry:
     def get_all_data(self): return {"position":{"latitude":0}}
 class NoCommands:

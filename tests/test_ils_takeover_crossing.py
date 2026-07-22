@@ -49,10 +49,10 @@ class TestILSCrossingDetection:
         assert result is True, "Takeover should trigger at 244ft (crossing DH+50)"
 
     def test_large_step_below_dh_triggers_dh_guard_go_around(self):
-        """FIX-9: 270 → 190: production DH guard → go-around.
+        """FIX-9: 270 → 190: production DH guard → abort.
 
         Below DH without completed takeover → DH guard in
-        FinalPhaseState.handle() triggers execute_go_around().
+        FinalPhaseState.handle() triggers abort_approach_critical().
         AutopilotTakeover.perform_takeover() does NOT fail with
         hard_safety (that check was removed in FIX-9).
         """
@@ -107,8 +107,8 @@ class TestILSCrossingDetection:
 
         result = phase.handle(telemetry_fh, approach_data, wind_data)
 
-        # DH guard should trigger go-around
-        system.execute_go_around.assert_called_once()
+        # DH guard should trigger abort
+        system.abort_approach_critical.assert_called_once()
         # Takeover should NOT be completed
         assert takeover.status.completed is False
 
@@ -260,8 +260,8 @@ class TestILSCrossingDetection:
 
         result = phase.handle(telemetry, approach_data, wind_data)
 
-        # Should trigger go-around
-        system.execute_go_around.assert_called_once()
+        # Should trigger abort
+        system.abort_approach_critical.assert_called_once()
 
     def test_ils_takeover_at_244ft_completes_with_readback(self):
         """FIX-9 regression: ILS CAT I, DH=200, altitude_agl=244.

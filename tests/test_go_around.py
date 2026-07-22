@@ -1,83 +1,135 @@
-"""F3/F4 tests: execute_go_around re-engages AP + error budget go-around."""
+"""Tests for abort_approach_critical — unified critical abort handler.
+
+Replaces old execute_go_around tests. abort_approach_critical must NOT
+send any actuator commands (AP, axes, throttle, flaps, gear, heading,
+altitude, speed). It only: logs CRITICAL, plays audio alert, deactivates
+our autothrottle, centers vJoy, and calls stop_approach.
+"""
 from unittest.mock import MagicMock, patch
 from tests.fakes import FakeControl
 
 
-class TestGoAroundF3:
-    def test_go_around_reengages_ap_master(self):
-        """execute_go_around() must call set_autopilot_master(True)."""
+class TestAbortApproachCritical:
+    def test_abort_logs_critical_with_reason(self):
+        """abort_approach_critical must log CRITICAL with the reason string."""
         from main import AutoLandSystem
         system = AutoLandSystem.__new__(AutoLandSystem)
         system.control = FakeControl()
         system.autothrottle = MagicMock()
         system.autothrottle.active = False
         system.use_vjoy = False
-        system.vjoy_throttle = None
         system.virtual_joystick = MagicMock()
-        system.stabilized_monitor = MagicMock()
         system.telemetry_recorder = MagicMock()
         system.phase = MagicMock()
         system.phase.value = 'FINAL'
+        system.audio_system = MagicMock()
+        system.audio_system.is_available.return_value = False
 
-        system.execute_go_around()
+        with patch('main.logger') as mock_logger:
+            system.abort_approach_critical("test reason")
+            mock_logger.critical.assert_called_with(
+                "APPROACH ABORTED: %s", "test reason"
+            )
 
-        assert system.control.has_call('set_autopilot_master'), (
-            "AP master should be re-engaged in go-around")
-        # First call should be True (re-engage)
-        ap_calls = system.control.calls_of('set_autopilot_master')
-        assert ap_calls[0][1] is True, (
-            f"AP master should be re-engaged to True, got {ap_calls[0][1]}")
-
-    def test_go_around_sends_gear_up(self):
-        """execute_go_around() must call set_gear(False) — real gear UP command."""
+    def test_abort_calls_stop_approach(self):
+        """abort_approach_critical must call stop_approach()."""
         from main import AutoLandSystem
         system = AutoLandSystem.__new__(AutoLandSystem)
         system.control = FakeControl()
         system.autothrottle = MagicMock()
         system.autothrottle.active = False
         system.use_vjoy = False
-        system.vjoy_throttle = None
         system.virtual_joystick = MagicMock()
-        system.stabilized_monitor = MagicMock()
         system.telemetry_recorder = MagicMock()
         system.phase = MagicMock()
         system.phase.value = 'FINAL'
+        system.audio_system = MagicMock()
+        system.audio_system.is_available.return_value = False
 
-        system.execute_go_around()
+        with patch.object(system, 'stop_approach') as mock_stop:
+            system.abort_approach_critical("test")
+            mock_stop.assert_called_once()
 
-        assert system.control.has_call('set_gear'), "Gear command should be sent"
-        gear_calls = system.control.calls_of('set_gear')
-        assert gear_calls[0][1] is False, "Gear should be UP (False)"
+    def test_abort_deactivates_our_autothrottle(self):
+        """abort_approach_critical must deactivate our autothrottle if active."""
+        from main import AutoLandSystem
+        system = AutoLandSystem.__new__(AutoLandSystem)
+        system.control = FakeControl()
+        system.autothrottle = MagicMock()
+        system.autothrottle.active = True
+        system.use_vjoy = False
+        system.virtual_joystick = MagicMock()
+        system.telemetry_recorder = MagicMock()
+        system.phase = MagicMock()
+        system.phase.value = 'FINAL'
+        system.audio_system = MagicMock()
+        system.audio_system.is_available.return_value = False
 
-    def test_go_around_sends_vs_and_throttle(self):
-        """execute_go_around() sends VS=1500 and throttle=1.0."""
+        with patch.object(system, 'stop_approach'):
+            system.abort_approach_critical("test")
+            system.autothrottle.deactivate.assert_called_once()
+
+    def test_abort_centers_vjoy(self):
+        """abort_approach_critical must center vJoy axes when vJoy is used."""
+        from main import AutoLandSystem
+        system = AutoLandSystem.__new__(AutoLandSystem)
+        system.control = FakeControl()
+        system.autothrottle = MagicMock()
+        system.autothrottle.active = False
+        system.use_vjoy = True
+        system.virtual_joystick = MagicMock()
+        system.telemetry_recorder = MagicMock()
+        system.phase = MagicMock()
+        system.phase.value = 'FINAL'
+        system.audio_system = MagicMock()
+        system.audio_system.is_available.return_value = False
+
+        with patch.object(system, 'stop_approach'):
+            system.abort_approach_critical("test")
+            system.virtual_joystick.center_all_axes.assert_called_once()
+
+    def test_abort_sends_no_actuator_commands(self):
+        """abort_approach_critical must NOT send any actuator commands.
+
+        No AP, no axes, no throttle, no flaps, no gear, no heading,
+        no altitude, no speed commands.
+        """
         from main import AutoLandSystem
         system = AutoLandSystem.__new__(AutoLandSystem)
         system.control = FakeControl()
         system.autothrottle = MagicMock()
         system.autothrottle.active = False
         system.use_vjoy = False
-        system.vjoy_throttle = None
         system.virtual_joystick = MagicMock()
-        system.stabilized_monitor = MagicMock()
         system.telemetry_recorder = MagicMock()
         system.phase = MagicMock()
         system.phase.value = 'FINAL'
+        system.audio_system = MagicMock()
+        system.audio_system.is_available.return_value = False
 
-        system.execute_go_around()
+        with patch.object(system, 'stop_approach'):
+            system.abort_approach_critical("test")
 
-        assert system.control.has_call('set_vertical_speed')
-        vs_calls = system.control.calls_of('set_vertical_speed')
-        assert vs_calls[0][1] == 1500
-
-        assert system.control.has_call('set_throttle')
-        thr_calls = system.control.calls_of('set_throttle')
-        assert thr_calls[0][1] == 1.0
+        ctrl = system.control
+        assert not ctrl.has_call('set_autopilot_master'), \
+            "abort must NOT send AP master"
+        assert not ctrl.has_call('set_heading_hold'), \
+            "abort must NOT send heading hold"
+        assert not ctrl.has_call('set_vertical_speed'), \
+            "abort must NOT send vertical speed"
+        assert not ctrl.has_call('set_throttle'), \
+            "abort must NOT send throttle"
+        assert not ctrl.has_call('set_flaps'), \
+            "abort must NOT send flaps"
+        assert not ctrl.has_call('set_gear'), \
+            "abort must NOT send gear"
+        assert not ctrl.has_call('set_airspeed_hold'), \
+            "abort must NOT send airspeed hold"
 
 
 class TestErrorBudgetF4:
-    def test_error_budget_goaround_after_takeover(self):
-        """3 errors + takeover.completed → execute_go_around (not stop)."""
+    def test_error_budget_abort_after_takeover(self):
+        """3 errors + takeover.completed → abort_approach_critical."""
         from main import AutoLandSystem
         system = AutoLandSystem.__new__(AutoLandSystem)
         system.control = FakeControl()
@@ -105,19 +157,19 @@ class TestErrorBudgetF4:
         system.safety_guard = None
         system.approach_config = MagicMock()
         system.approach_config.approach_speed = 120
+        system.approach_config.station = MagicMock()
+        system.approach_config.station.type = 'VOR'
 
-        # Force 3 consecutive errors by making get_all_data raise
+        # Force 3 consecutive errors
         system.telemetry = MagicMock()
         system.telemetry.get_all_data.side_effect = SimulatedError("test")
 
-        with patch.object(system, 'execute_go_around') as mock_ga:
-            with patch.object(system, 'stop_approach') as mock_stop:
-                system.execute_approach()
-                mock_ga.assert_called_once()
-                mock_stop.assert_not_called()
+        with patch.object(system, 'abort_approach_critical') as mock_abort:
+            system.execute_approach()
+            mock_abort.assert_called_once()
 
-    def test_error_budget_stop_before_takeover(self):
-        """3 errors + takeover NOT completed → stop_approach (safe, AP on)."""
+    def test_error_budget_abort_before_takeover(self):
+        """3 errors + takeover NOT completed → abort_approach_critical (unified)."""
         from main import AutoLandSystem
         system = AutoLandSystem.__new__(AutoLandSystem)
         system.control = FakeControl()
@@ -145,15 +197,15 @@ class TestErrorBudgetF4:
         system.safety_guard = None
         system.approach_config = MagicMock()
         system.approach_config.approach_speed = 120
+        system.approach_config.station = MagicMock()
+        system.approach_config.station.type = 'VOR'
 
         system.telemetry = MagicMock()
         system.telemetry.get_all_data.side_effect = SimulatedError("test")
 
-        with patch.object(system, 'execute_go_around') as mock_ga:
-            with patch.object(system, 'stop_approach') as mock_stop:
-                system.execute_approach()
-                mock_stop.assert_called_once()
-                mock_ga.assert_not_called()
+        with patch.object(system, 'abort_approach_critical') as mock_abort:
+            system.execute_approach()
+            mock_abort.assert_called_once()
 
 
 class SimulatedError(Exception):

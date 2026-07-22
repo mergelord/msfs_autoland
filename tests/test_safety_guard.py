@@ -30,6 +30,7 @@ from modules.safety_guard import (
     GuardResult,
     SafetySnapshot,
 )
+from modules.approach_phases import GlideslopePitchConfig
 from modules.types import ApproachConfig, NavStation
 from tests.fakes import make_telemetry
 
@@ -301,7 +302,7 @@ class TestGuardPerRuleDebounce:
 # ═══════════════════════════════════════════════════════════════════
 
 class TestIntegrationFinalCriticalViolation:
-    """T1: FINAL + critical sink rate → go-around, no actuator commands."""
+    """T1: FINAL + critical sink rate → abort, no actuator commands."""
 
     def test_go_around_on_critical_sink_rate(self, caplog):
         from main import AutoLandSystem, ApproachPhase
@@ -319,7 +320,9 @@ class TestIntegrationFinalCriticalViolation:
         system.fms_reader = None
         system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
-        system.execute_go_around = MagicMock()
+        system.abort_approach_critical = MagicMock()
+        system.audio_system = MagicMock()
+        system.audio_system.is_available.return_value = False
 
         telemetry = make_telemetry(vertical_speed=-2000, altitude_agl=500, airspeed=120)
         approach_data = {"distance_to_station": 5.0, "required_altitude": 2000,
@@ -327,7 +330,7 @@ class TestIntegrationFinalCriticalViolation:
 
         system._handle_phase(telemetry, approach_data)
 
-        system.execute_go_around.assert_called_once()
+        system.abort_approach_critical.assert_called_once()
         system.phase_state.handle.assert_not_called()
 
 
@@ -382,7 +385,7 @@ class TestIntegrationNonFinalPhase:
         system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
         system.phase_state.handle.return_value = None
-        system.execute_go_around = MagicMock()
+        system.abort_approach_critical = MagicMock()
         system._update_phase_enum = MagicMock()
 
         telemetry = make_telemetry(vertical_speed=-2000, altitude_agl=500,
@@ -395,17 +398,17 @@ class TestIntegrationNonFinalPhase:
 
     def test_initial_no_go_around(self):
         system = self._run_phase("INITIAL")
-        system.execute_go_around.assert_not_called()
+        system.abort_approach_critical.assert_not_called()
         system.phase_state.handle.assert_called_once()
 
     def test_intermediate_no_go_around(self):
         system = self._run_phase("INTERMEDIATE")
-        system.execute_go_around.assert_not_called()
+        system.abort_approach_critical.assert_not_called()
         system.phase_state.handle.assert_called_once()
 
     def test_landing_no_go_around(self):
         system = self._run_phase("LANDING")
-        system.execute_go_around.assert_not_called()
+        system.abort_approach_critical.assert_not_called()
         system.phase_state.handle.assert_called_once()
 
 
@@ -431,7 +434,7 @@ class TestIntegrationApproachTypes:
         system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
         system.phase_state.handle.return_value = None
-        system.execute_go_around = MagicMock()
+        system.abort_approach_critical = MagicMock()
         system._update_phase_enum = MagicMock()
 
         telemetry = make_telemetry(vertical_speed=-700, altitude_agl=500,
@@ -440,7 +443,7 @@ class TestIntegrationApproachTypes:
                          "on_course": True, "cross_track_error": 0.5}
 
         system._handle_phase(telemetry, approach_data)
-        system.execute_go_around.assert_not_called()
+        system.abort_approach_critical.assert_not_called()
         system.phase_state.handle.assert_called_once()
 
     def test_ils_normal(self):
@@ -476,10 +479,10 @@ class TestIntegrationIdempotence:
         system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
         call_count = 0
-        def fake_go_around():
+        def fake_abort(reason=None):
             nonlocal call_count
             call_count += 1
-        system.execute_go_around = fake_go_around
+        system.abort_approach_critical = fake_abort
 
         telemetry = make_telemetry(vertical_speed=-2000, altitude_agl=500, airspeed=120)
         approach_data = {"distance_to_station": 5.0, "required_altitude": 2000,
@@ -511,10 +514,10 @@ class TestIntegrationGuardAndExistingMonitorCoexist:
         system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
         call_count = 0
-        def fake_go_around():
+        def fake_abort(reason=None):
             nonlocal call_count
             call_count += 1
-        system.execute_go_around = fake_go_around
+        system.abort_approach_critical = fake_abort
 
         telemetry = make_telemetry(vertical_speed=-2000, altitude_agl=500, airspeed=120)
         approach_data = {"distance_to_station": 5.0, "required_altitude": 2000,
@@ -565,7 +568,7 @@ class TestIntegrationLogging:
         system.fms_reader = None
         system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
-        system.execute_go_around = MagicMock()
+        system.abort_approach_critical = MagicMock()
 
         telemetry = make_telemetry(vertical_speed=-2000, altitude_agl=500, airspeed=120)
         approach_data = {"distance_to_station": 5.0, "required_altitude": 2000,
@@ -574,7 +577,7 @@ class TestIntegrationLogging:
         with caplog.at_level(logging.CRITICAL, logger="main"):
             system._handle_phase(telemetry, approach_data)
 
-        assert "SAFETY GUARD: GO_AROUND" in caplog.text
+        assert "SAFETY GUARD: ABORT" in caplog.text
         assert "CRITICAL_SINK_RATE" in caplog.text
 
     def test_near_trigger_logged(self, caplog):
@@ -595,7 +598,7 @@ class TestIntegrationLogging:
         system._last_guard_snapshot_log_time = 0.0
         system.phase_state = MagicMock()
         system.phase_state.handle.return_value = None
-        system.execute_go_around = MagicMock()
+        system.abort_approach_critical = MagicMock()
         system._update_phase_enum = MagicMock()
 
         telemetry = make_telemetry(vertical_speed=-2000, altitude_agl=500, airspeed=120)
@@ -622,14 +625,14 @@ class TestIntegrationLocSignalLossUntouched:
             "TEST_LOC", 11030000, 55.5, 37.5, "LOC")
         system.safety_guard = ApproachSafetyGuard(debounce_n=1)
         system.wind_correction = MagicMock()
-        system.execute_go_around = MagicMock()
+        system.abort_approach_critical = MagicMock()
         system.phase_state = MagicMock()
         system.telemetry_recorder = MagicMock()
 
         # _calculate_approach_data returns None for LOC signal loss
         # execute_go_around is called inside _calculate_approach_data (original contract)
         system._handle_phase(None, None)  # approach_data=None → no-op
-        system.execute_go_around.assert_not_called()  # not called by _handle_phase
+        system.abort_approach_critical.assert_not_called()  # not called by _handle_phase
         system.phase_state.handle.assert_not_called()
 
 
@@ -664,7 +667,7 @@ class TestRedWithoutFix:
         system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
         system.phase_state.handle.return_value = None
-        system.execute_go_around = MagicMock()
+        system.abort_approach_critical = MagicMock()
         system._update_phase_enum = MagicMock()
 
         telemetry = make_telemetry(vertical_speed=-2000, altitude_agl=500, airspeed=120)
@@ -677,7 +680,7 @@ class TestRedWithoutFix:
             system._handle_phase(telemetry, approach_data)
 
         # Without real guard, go-around NOT called — normal handling proceeds
-        system.execute_go_around.assert_not_called()
+        system.abort_approach_critical.assert_not_called()
         system.phase_state.handle.assert_called_once()
 
     def test_t18_phase_gate_removal_allows_non_final_go_around(self):
@@ -700,7 +703,7 @@ class TestRedWithoutFix:
         system.telemetry_recorder = MagicMock()
         system.phase_state = MagicMock()
         system.phase_state.handle.return_value = None
-        system.execute_go_around = MagicMock()
+        system.abort_approach_critical = MagicMock()
         system._update_phase_enum = MagicMock()
 
         telemetry = make_telemetry(vertical_speed=-2000, altitude_agl=500, airspeed=120)
@@ -709,7 +712,7 @@ class TestRedWithoutFix:
 
         # With phase gate, INITIAL does NOT trigger guard → no go_around
         system._handle_phase(telemetry, approach_data)
-        system.execute_go_around.assert_not_called()
+        system.abort_approach_critical.assert_not_called()
         system.phase_state.handle.assert_called_once()
 
 
@@ -854,21 +857,31 @@ def test_vs_nan_does_not_crash_control_aircraft():
     state = FinalPhaseState.__new__(FinalPhaseState)
     state.system = system
     state._ownership = MagicMock()
-    state._ownership.pitch = ControlOwner.AIRCRAFT_AP
-    state._ownership.roll = ControlOwner.AIRCRAFT_AP
+    state._ownership.pitch = ControlOwner.EXTERNAL
+    state._ownership.roll = ControlOwner.EXTERNAL
+    state._glideslope_config = GlideslopePitchConfig()
+    state._vs_error_filtered = 0.0
+    state._vs_error_prev = 0.0
 
     wind_data = {'corrected_vs': float('nan'), 'corrected_heading': 270,
                  'headwind': 10, 'crosswind': 5, 'drift_angle': 2.0}
-    telemetry = {'position': {'altitude_agl': 500}, 'speed': {'vertical_speed': -500}}
+    telemetry = {
+        'position': {'altitude_agl': 500},
+        'speed': {'vertical_speed': -500, 'ground_speed': 140},
+        'attitude': {'bank': 0, 'pitch': 2.5, 'heading_magnetic': 270},
+    }
 
+    # After pretakeover removal: no AP VS commands sent
     state._control_aircraft(telemetry, wind_data)
-    system.control.set_vertical_speed.assert_called_once()
-    call_args = system.control.set_vertical_speed.call_args[0][0]
-    assert call_args == 0, f"Expected 0 fallback, got {call_args}"
+    system.control.set_vertical_speed.assert_not_called()
 
 
 def test_vs_inf_does_not_crash_control_aircraft():
-    """Finding 2: inf corrected_vs must not raise OverflowError."""
+    """Finding 2: inf corrected_vs must not raise OverflowError.
+
+    After pretakeover removal: NaN/inf guard is in _compute_pitch_command,
+    not in _control_aircraft (AP VS channel removed).
+    """
     from modules.approach_phases import FinalPhaseState
     from modules.control_ownership import ControlOwner
     from unittest.mock import MagicMock
@@ -884,14 +897,20 @@ def test_vs_inf_does_not_crash_control_aircraft():
     state = FinalPhaseState.__new__(FinalPhaseState)
     state.system = system
     state._ownership = MagicMock()
-    state._ownership.pitch = ControlOwner.AIRCRAFT_AP
-    state._ownership.roll = ControlOwner.AIRCRAFT_AP
+    state._ownership.pitch = ControlOwner.EXTERNAL
+    state._ownership.roll = ControlOwner.EXTERNAL
+    state._glideslope_config = GlideslopePitchConfig()
+    state._vs_error_filtered = 0.0
+    state._vs_error_prev = 0.0
 
     wind_data = {'corrected_vs': float('inf'), 'corrected_heading': 270,
                  'headwind': 10, 'crosswind': 5, 'drift_angle': 2.0}
-    telemetry = {'position': {'altitude_agl': 500}, 'speed': {'vertical_speed': -500}}
+    telemetry = {
+        'position': {'altitude_agl': 500},
+        'speed': {'vertical_speed': -500, 'ground_speed': 140},
+        'attitude': {'bank': 0, 'pitch': 2.5, 'heading_magnetic': 270},
+    }
 
+    # After pretakeover removal: no AP VS commands sent
     state._control_aircraft(telemetry, wind_data)
-    system.control.set_vertical_speed.assert_called_once()
-    call_args = system.control.set_vertical_speed.call_args[0][0]
-    assert call_args == 0
+    system.control.set_vertical_speed.assert_not_called()

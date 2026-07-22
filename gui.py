@@ -1484,9 +1484,9 @@ class AutoLandGUI:
             logging.info("Audio alerts %s", status)
 
     def go_around(self):
-        """Уход на второй круг"""
+        """Аварийный останов захода"""
         if self.system:
-            self.system.execute_go_around()
+            self.system.abort_approach_critical("manual abort from GUI")
 
     def _get_compatibility_info(self, adapter):
         """Получить информацию о совместимости адаптера"""

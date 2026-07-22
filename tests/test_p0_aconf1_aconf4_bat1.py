@@ -568,7 +568,8 @@ class TestSimConnectContract:
         assert result.stdout.strip() == "OK", f"contract check: {result.stdout.strip()}"
 
     def test_sdk_only_events_defined(self):
-        """SDK_ONLY_EVENTS contains exactly the 3 confirmed SDK-only names."""
+        """SDK_ONLY_EVENTS contains exactly the confirmed SDK-only names."""
         assert SDK_ONLY_EVENTS == frozenset({
             "AP_VS_ON", "NAV1_RADIO_SET_HZ", "NAV2_RADIO_SET_HZ",
+            "AUTO_THROTTLE_ARM",
         })

@@ -6,6 +6,7 @@
 import logging
 import math
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
 from modules.control_ownership import ControlOwner, compute_ownership
@@ -14,6 +15,15 @@ if TYPE_CHECKING:
     from main import AutoLandSystem
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class GlideslopePitchConfig:
+    """CALIBRATION REQUIRED: seed values — not flight-validated."""
+    kd_seed: float = 0.0            # deg per (fpm/s); 0.0 = pure P until calibrated
+    vs_error_filter_tau_s: float = 0.5
+    pitch_correction_limit_deg: float = 3.0
+    min_gs_kt: float = 50.0
 
 
 class ApproachPhaseState(ABC):
@@ -66,10 +76,6 @@ class InitialPhaseState(ApproachPhaseState):
                    dme_distance, cross_track, wind_data['wind_speed'],
                    wind_data['wind_direction'], wind_data['crosswind'])
 
-        # Установка курса с учётом ветра
-        corrected_heading = wind_data['corrected_heading']
-        self.system.control.set_heading_hold(int(corrected_heading))
-
         # Переход к промежуточной фазе при перехвате курса
         if approach_data.get('on_course', False) and dme_distance < 15:
             logger.info("Transitioning to INTERMEDIATE phase")
@@ -120,16 +126,6 @@ class IntermediatePhaseState(ApproachPhaseState):
                    dme_distance, altitude,
                    "%.0f" % required_alt if required_alt is not None else "N/A",
                    wind_data['headwind'], fix_info)
-
-        # Установка скорректированного курса (только если передача управления завершена)
-        if self.system.autopilot_takeover.status.completed:
-            corrected_heading = wind_data['corrected_heading']
-            self.system.control.set_heading_hold(int(corrected_heading))
-
-            # Снижение до глиссады с учётом встречного ветра
-            if required_alt is not None and altitude > required_alt + 200:
-                vs = -500
-                self.system.control.set_vertical_speed(vs)
 
         # Переход к финальной фазе
         # F2: approach-type-aware gate — ILS transitions on LOC capture + distance,
@@ -241,8 +237,7 @@ class IntermediatePhaseState(ApproachPhaseState):
         # Проверка на ошибку
         if takeover_status.failed:
             logger.critical("TAKEOVER FAILED: %s", takeover_status.error_message)
-            logger.critical("Aborting approach - GO AROUND")
-            self.system.execute_go_around()
+            self.system.abort_approach_critical("takeover failed: %s" % takeover_status.error_message)
             return False
 
         return True
@@ -250,6 +245,12 @@ class IntermediatePhaseState(ApproachPhaseState):
 
 class FinalPhaseState(ApproachPhaseState):
     """Финальная фаза: точное следование по глиссаде"""
+
+    def __init__(self, system: 'AutoLandSystem'):
+        super().__init__(system)
+        self._glideslope_config = GlideslopePitchConfig()
+        self._vs_error_filtered: float = 0.0
+        self._vs_error_prev: float = 0.0
 
     def get_phase_name(self) -> str:
         return "FINAL"
@@ -310,8 +311,8 @@ class FinalPhaseState(ApproachPhaseState):
             if not self.system.autopilot_takeover.status.completed:
                 logger.critical(
                     "DH GUARD: Below DH/MDA (%.0fft) without confirmed "
-                    "takeover - GO AROUND", radio_height)
-                self.system.execute_go_around()
+                    "takeover - ABORT", radio_height)
+                self.system.abort_approach_critical("not stabilized at decision height")
                 return None
 
             if not self._check_final_stabilization(radio_height):
@@ -370,8 +371,7 @@ class FinalPhaseState(ApproachPhaseState):
 
         if takeover_status.failed:
             logger.critical("TAKEOVER FAILED: %s", takeover_status.error_message)
-            logger.critical("Aborting approach - GO AROUND")
-            self.system.execute_go_around()
+            self.system.abort_approach_critical("takeover failed: %s" % takeover_status.error_message)
             return False
 
         return True
@@ -403,10 +403,10 @@ class FinalPhaseState(ApproachPhaseState):
                          turbulence_alert.g_force_std, turbulence_alert.bank_oscillation,
                          turbulence_alert.recommendation)
 
-        # При критическом сдвиге ветра - автоматический уход на второй круг
+        # При критическом сдвиге ветра - аварийный останов
         if wind_shear_alert and wind_shear_alert.severity == 'CRITICAL' and radio_height < 500:
-            logger.critical("CRITICAL WIND SHEAR BELOW 500ft - EXECUTING GO AROUND!")
-            self.system.execute_go_around()
+            logger.critical("CRITICAL WIND SHEAR BELOW 500ft - ABORTING!")
+            self.system.abort_approach_critical("critical wind shear below 500 ft")
             return False
 
         return True
@@ -442,16 +442,12 @@ class FinalPhaseState(ApproachPhaseState):
                          runway_check['required_with_margin'], runway_check['runway_length'])
 
     def _control_aircraft(self, telemetry: dict, wind_data: dict):
-        """Управление самолётом (курс, крен, тангаж)"""
+        """Управление самолётом (курс, крен, тангаж) — direct control only after takeover."""
 
         ownership = getattr(self, '_ownership', None)
         corrected_heading = wind_data['corrected_heading']
 
-        # AP commands only when roll/pitch owner is AIRCRAFT_AP
-        if ownership is None or ownership.roll == ControlOwner.AIRCRAFT_AP:
-            self.system.control.set_heading_hold(int(corrected_heading))
-
-        # vJoy commands only when roll/pitch owner is EXTERNAL
+        # vJoy commands only when roll/pitch owner is EXTERNAL (post-takeover)
         if (self.system.use_vjoy and
                 ownership is not None and
                 ownership.roll == ControlOwner.EXTERNAL):
@@ -467,7 +463,7 @@ class FinalPhaseState(ApproachPhaseState):
                 current_bank, target_bank, max_input=0.2
             )
 
-            target_pitch = 2.5
+            target_pitch = self._compute_pitch_command(telemetry, wind_data)
             elevator_input = self.system.virtual_joystick.calculate_pitch_correction(
                 current_pitch, target_pitch, max_input=0.15
             )
@@ -478,22 +474,91 @@ class FinalPhaseState(ApproachPhaseState):
                 rudder=0.0
             )
 
-        # Вертикальная скорость — only if pitch owner is AP
-        if ownership is None or ownership.pitch == ControlOwner.AIRCRAFT_AP:
-            if self.system.synthetic_glidepath is not None:
-                vs = self.system.synthetic_glidepath.compute_target_vs(
-                    telemetry, wind_data['corrected_vs']
-                )
-            else:
-                vs = wind_data['corrected_vs']
-            # Guard against NaN/inf in vs before int() cast (Finding 2)
-            if not math.isfinite(vs):
-                logger.warning("Non-finite vs=%s, holding current VS", vs)
-                vs = 0.0
-            self.system.control.set_vertical_speed(-int(vs))
+        # Fallback SimConnect axes (direct elevator/aileron, no AP channel)
+        elif (not self.system.use_vjoy and
+              ownership is not None and
+              ownership.roll == ControlOwner.EXTERNAL):
+            # Block 4.4: use same pitch command for both channels
+            target_pitch = self._compute_pitch_command(telemetry, wind_data)
+            current_pitch = telemetry['attitude']['pitch']
+            current_heading = telemetry['attitude']['heading_magnetic']
+            corrected_heading_val = corrected_heading
+
+            target_bank = self.system.virtual_joystick.calculate_heading_correction(
+                current_heading, corrected_heading_val, telemetry['attitude']['bank'], max_bank=10.0
+            )
+            aileron_input = self.system.virtual_joystick.calculate_bank_correction(
+                telemetry['attitude']['bank'], target_bank, max_input=0.2
+            )
+            elevator_input = self.system.virtual_joystick.calculate_pitch_correction(
+                current_pitch, target_pitch, max_input=0.15
+            )
+
+            # Deliver via direct SimConnect axes (MSFSControl)
+            raw_control = self.system.control
+            if hasattr(raw_control, 'set_aileron'):
+                raw_control.set_aileron(aileron_input)
+            if hasattr(raw_control, 'set_elevator'):
+                raw_control.set_elevator(elevator_input)
+
+    def _compute_pitch_command(self, telemetry: dict, wind_data: dict) -> float:
+        """Compute target pitch via P+D glideslope controller.
+
+        P-member: physical kinematic formula VS = GS * tan(gamma) * 101.3
+        D-member: configurable seed, filtered derivative.
+        Returns target pitch in degrees.
+        """
+        cfg = self._glideslope_config
+
+        # Target VS from synthetic glidepath or wind correction
+        if self.system.synthetic_glidepath is not None:
+            vs_target = self.system.synthetic_glidepath.compute_target_vs(
+                telemetry, wind_data['corrected_vs']
+            )
+        else:
+            vs_target = wind_data['corrected_vs']
+
+        if not math.isfinite(vs_target):
+            logger.warning("Non-finite vs_target=%s, using 0.0", vs_target)
+            vs_target = 0.0
+
+        # Actual VS (SimConnect convention: negative = descent)
+        current_vs = telemetry['speed']['vertical_speed']
+
+        # VS error in positive-up convention: positive error = descending too fast
+        vs_error = (-vs_target) - current_vs
+
+        # Ground speed with guard
+        gs_kt = telemetry['speed']['ground_speed']
+        gs_kt = max(gs_kt, cfg.min_gs_kt) if math.isfinite(gs_kt) else cfg.min_gs_kt
+
+        # P-member: pitch_correction_deg = vs_error / (GS_kt * 101.3 * pi/180)
+        # Denominator ≈ GS_kt * 1.768 — pitch degree cost in fpm
+        denominator = gs_kt * 101.3 * math.pi / 180.0
+        pitch_correction_deg = vs_error / denominator if denominator > 0 else 0.0
+
+        # D-member (filtered derivative)
+        tau = cfg.vs_error_filter_tau_s
+        dt = 0.5  # approach loop period
+        alpha = dt / (tau + dt) if tau > 0 else 1.0
+        self._vs_error_filtered = alpha * vs_error + (1 - alpha) * self._vs_error_filtered
+        d_error = (self._vs_error_filtered - self._vs_error_prev) / dt if dt > 0 else 0.0
+        self._vs_error_prev = self._vs_error_filtered
+        pitch_correction_deg += -cfg.kd_seed * d_error
+
+        # Clamp
+        pitch_correction_deg = max(-cfg.pitch_correction_limit_deg,
+                                   min(cfg.pitch_correction_limit_deg, pitch_correction_deg))
+
+        current_pitch = telemetry['attitude']['pitch']
+        return current_pitch + pitch_correction_deg
 
     def _control_throttle(self, telemetry: dict, wind_data: dict):
-        """Управление тягой — с учётом ownership (WP-5)."""
+        """Управление тягой — гейтинг по takeover + autothrottle."""
+        # Block 4.1: No throttle commands until takeover completed
+        if not self.system.autopilot_takeover.status.completed:
+            return
+
         ownership = getattr(self, '_ownership', None)
 
         if self.system.use_autothrottle and self.system.autothrottle.active:
@@ -531,13 +596,7 @@ class FinalPhaseState(ApproachPhaseState):
 
                 if throttle_data.get('is_stable', False):
                     logger.debug("Autothrottle: %.1f%% (stable)", throttle_data['throttle']*100)
-        else:
-            # No autothrottle — EXTERNAL owns throttle if vJoy ready
-            if (ownership is not None and
-                    ownership.throttle == ControlOwner.EXTERNAL):
-                pass  # vJoy throttle handled externally
-            else:
-                self.system.control.set_throttle(0.5)
+        # else: no autothrottle active — throttle stays with pilot/external
 
     def _get_aircraft_weight(self, telemetry: dict) -> float:
         """Получение веса самолёта"""
@@ -580,14 +639,17 @@ class FinalPhaseState(ApproachPhaseState):
         self.system.stabilized_monitor.check_continuous_monitoring(telemetry, approach_data)
 
         if self.system.stabilized_monitor.should_go_around(radio_height):
-            logger.critical("GO AROUND INITIATED!")
-            self.system.execute_go_around()
+            logger.critical("APPROACH ABORTED: not stabilized")
+            self.system.abort_approach_critical("not stabilized at decision height")
             return False
 
         return True
 
     def _deploy_flaps_and_gear(self, radio_height: float):
         """Выпуск закрылков и шасси (идемпотентно, без спама SimConnect)"""
+        # Block 4.2: No actuator commands until takeover completed
+        if not self.system.autopilot_takeover.status.completed:
+            return
 
         # Состояние храним на phase state — чтобы не дёргать SimConnect каждые 0.5s
         if not hasattr(self, '_flaps_2_deployed'):
@@ -620,8 +682,8 @@ class FinalPhaseState(ApproachPhaseState):
             False если нужен go around
         """
         if not self.system.stabilized_monitor.is_stabilized and radio_height > 200:
-            logger.warning("Not stabilized at decision height - GO AROUND")
-            self.system.execute_go_around()
+            logger.warning("Not stabilized at decision height - ABORT")
+            self.system.abort_approach_critical("not stabilized at decision height")
             return False
 
         return True

@@ -349,8 +349,8 @@ class TestSinkRateProductionPath:
 
         # Should return False (takeover failed)
         assert result is False
-        # Go around should be triggered
-        system.execute_go_around.assert_called_once()
+        # Abort should be triggered
+        system.abort_approach_critical.assert_called_once()
 
 
 # ═══════════════════════════════════════════════════════════════════

@@ -268,12 +268,12 @@ class TestRealFlushCloseFailure:
 # ═══════════════════════════════════════════════════════════════════
 
 class TestPendingFramePattern:
-    """T2: Real actuator → disk I/O order via real execute_go_around."""
+    """T2: Real actuator → disk I/O order via real abort_approach_critical."""
 
     def test_go_around_actuator_before_flush(self, tmp_path):
-        """Real AutoLandSystem.execute_go_around with FakeControl.
-        Proves: set_throttle < writerow, set_vertical_speed < writerow,
-        set_flaps < writerow. Exactly 1 CSV terminal row."""
+        """Real AutoLandSystem.abort_approach_critical with FakeControl.
+        Proves: set_pending_frame < writerow, set_pending_frame < file_flush.
+        After pretakeover removal: no actuator commands sent during abort."""
         from main import AutoLandSystem, ApproachPhase
         from modules.safety_guard import ApproachSafetyGuard
         from modules.types import ApproachConfig, NavStation
@@ -312,6 +312,8 @@ class TestPendingFramePattern:
         system.stabilized_monitor = MagicMock()
         system.running = True
         system.phase = ApproachPhase.FINAL
+        system.audio_system = MagicMock()
+        system.audio_system.is_available.return_value = False
 
         # Track real events in order
         call_order = []
@@ -348,6 +350,13 @@ class TestPendingFramePattern:
             return original_flush()
         system.telemetry_recorder._file.flush = tracking_flush
 
+        # Track set_pending_frame
+        original_set_pending = system.telemetry_recorder.set_pending_frame
+        def tracking_set_pending(*args, **kwargs):
+            call_order.append("set_pending_frame")
+            return original_set_pending(*args, **kwargs)
+        system.telemetry_recorder.set_pending_frame = tracking_set_pending
+
         telemetry = make_telemetry(vertical_speed=-2000, altitude_agl=500,
                                    airspeed=120)
         approach_data = {"distance_to_station": 5.0, "required_altitude": 2000,
@@ -355,20 +364,17 @@ class TestPendingFramePattern:
 
         system._handle_phase(telemetry, approach_data)
 
-        # Real actuator commands were sent
-        assert control.has_call('set_throttle')
-        assert control.has_call('set_vertical_speed')
-        assert control.has_call('set_flaps')
+        # After pretakeover removal: abort sends NO actuator commands
+        assert not control.has_call('set_throttle'), \
+            "abort must NOT send throttle"
+        assert not control.has_call('set_vertical_speed'), \
+            "abort must NOT send vertical speed"
+        assert not control.has_call('set_flaps'), \
+            "abort must NOT send flaps"
 
-        # Verify order: actuator commands BEFORE disk I/O
-        assert call_order.index("set_throttle") < call_order.index("writerow")
-        assert call_order.index("set_vertical_speed") < call_order.index("writerow")
-        assert call_order.index("set_flaps") < call_order.index("writerow")
-
-        # Verify order: actuator commands BEFORE file flush
-        assert call_order.index("set_throttle") < call_order.index("file_flush")
-        assert call_order.index("set_vertical_speed") < call_order.index("file_flush")
-        assert call_order.index("set_flaps") < call_order.index("file_flush")
+        # Verify order: set_pending_frame BEFORE disk I/O
+        assert call_order.index("set_pending_frame") < call_order.index("writerow")
+        assert call_order.index("set_pending_frame") < call_order.index("file_flush")
 
         # Exactly 1 CSV terminal row
         system.telemetry_recorder.stop_recording()
@@ -387,10 +393,10 @@ class TestPendingFramePattern:
 # ═══════════════════════════════════════════════════════════════════
 
 class TestLocLossProductionPath:
-    """FIX-13: _calculate_approach_data calls execute_go_around for LOC loss."""
+    """FIX-13: _calculate_approach_data calls abort_approach_critical for LOC loss."""
 
     def test_loc_signal_loss_via_calculate_approach_data(self, tmp_path):
-        """Real LOC-loss path: _calculate_approach_data calls execute_go_around,
+        """Real LOC-loss path: _calculate_approach_data calls abort_approach_critical,
         sets pending frame, returns None. stop_recording flushes pending."""
         from main import AutoLandSystem, ApproachPhase
         from modules.types import ApproachConfig, NavStation
@@ -424,7 +430,7 @@ class TestLocLossProductionPath:
         system.running = True
         system.audio_alerts_enabled = False
         system.audio_system = MagicMock()
-        system.execute_go_around = MagicMock()
+        system.abort_approach_critical = MagicMock()
 
         system.telemetry_recorder = TelemetryRecorder(log_dir=str(tmp_path))
         system.telemetry_recorder.start_recording()
@@ -435,7 +441,7 @@ class TestLocLossProductionPath:
         # Real production path: _calculate_approach_data
         approach_data = system._calculate_approach_data(telemetry)
         assert approach_data is None  # LOC signal lost
-        system.execute_go_around.assert_called_once()
+        system.abort_approach_critical.assert_called_once()
 
         system.telemetry_recorder.stop_recording()
 
@@ -486,6 +492,8 @@ class TestTerminalGuardFrame:
         system.running = True
         system.phase = ApproachPhase.FINAL
         system.phase_state = MagicMock()
+        system.audio_system = MagicMock()
+        system.audio_system.is_available.return_value = False
 
         telemetry = make_telemetry(vertical_speed=-2000, altitude_agl=500,
                                    airspeed=120)
@@ -630,6 +638,8 @@ class TestRealExecuteApproach:
         system.use_autothrottle = False
         system.use_custom_autopilot = False
         system.audio_alerts_enabled = False
+        system.audio_system = MagicMock()
+        system.audio_system.is_available.return_value = False
         system.phase = ApproachPhase.FINAL
         system.safety_guard = ApproachSafetyGuard(debounce_n=2)
         system.wind_correction = MagicMock()

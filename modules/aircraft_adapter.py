@@ -318,54 +318,6 @@ class AircraftCommandAdapter:
             logger.error("Error setting vertical speed: %s", e)
             return False
 
-    def engage_approach_mode(self) -> bool:
-        """
-        Включить режим захода (Approach/APP)
-
-        Returns:
-            True если команда выполнена успешно
-        """
-        if not self.current_profile:
-            logger.error("No profile configured")
-            return False
-
-        try:
-            cmd = self.current_profile['autopilot']['commands'].get('approach_mode')
-
-            if not cmd:
-                logger.warning("Approach mode not defined in profile")
-                return False
-
-            method = cmd.get('method', 'simconnect')
-
-            if method == 'simconnect':
-                self.control.set_approach_hold(True)
-                logger.info("Approach mode engaged via SimConnect")
-                return True
-
-            elif method == 'event' and self.wasm:
-                event = cmd.get('event')
-                if self.wasm.trigger_event(event):
-                    logger.info("Approach mode engaged via event: %s", event)
-                    return True
-                else:
-                    logger.warning("Event trigger failed, using SimConnect fallback")
-                    self.control.set_approach_hold(True)
-                    return True
-
-            elif method == 'event':
-                logger.warning("Event method requires WASM: %s", cmd.get('event'))
-                self.control.set_approach_hold(True)
-                return True
-
-            else:
-                logger.error("Unknown method: %s", method)
-                return False
-
-        except Exception as e:
-            logger.error("Error engaging approach mode: %s", e)
-            return False
-
     def engage_nav_mode(self) -> bool:
         """
         Включить режим NAV
@@ -574,63 +526,6 @@ class AircraftCommandAdapter:
             logger.error("Error setting speed: %s", e)
             return False
 
-    def engage_autothrottle(self) -> bool:
-        """
-        Включить autothrottle
-
-        Returns:
-            True если команда выполнена успешно
-        """
-        if not self.current_profile:
-            logger.error("No profile configured")
-            return False
-
-        try:
-            autothrottle = self.current_profile.get('autothrottle', {})
-
-            if not autothrottle.get('supported', False):
-                logger.warning("Autothrottle not supported for this aircraft")
-                return False
-
-            cmd = autothrottle.get('commands', {}).get('engage')
-
-            if not cmd:
-                logger.warning("Autothrottle engage command not defined")
-                return False
-
-            method = cmd.get('method', 'simconnect')
-
-            if method == 'simconnect':
-                self.control.set_autothrottle(True)
-                logger.info("Autothrottle engaged via SimConnect")
-                return True
-
-            elif method == 'event' and self.wasm:
-                event = cmd.get('event')
-                if self.wasm.trigger_event(event):
-                    logger.info("Autothrottle engaged via event: %s", event)
-                    return True
-                else:
-                    self.control.set_autothrottle(True)
-                    return True
-
-            elif method == 'lvar' and self.wasm:
-                variable = cmd.get('variable')
-                if self.wasm.write_lvar(variable, 1.0):
-                    logger.info("Autothrottle engaged via LVAR: %s", variable)
-                    return True
-                else:
-                    self.control.set_autothrottle(True)
-                    return True
-
-            else:
-                self.control.set_autothrottle(True)
-                return True
-
-        except Exception as e:
-            logger.error("Error engaging autothrottle: %s", e)
-            return False
-
     def get_autopilot_status(self) -> Dict[str, Any]:
         """
         Получить статус автопилота
@@ -735,3 +630,10 @@ class AircraftCommandAdapter:
         Кастомные адаптеры (PMDG, Fenix) могут переопределить через LVars.
         """
         return None
+
+    def disengage_autothrottle(self) -> bool:
+        """Delegate to control.disengage_autothrottle().
+
+        Called by autopilot_takeover._send_disengage_commands via hasattr.
+        """
+        return self.control.disengage_autothrottle()

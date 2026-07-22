@@ -569,17 +569,18 @@ class TestILSExclusion:
 
         state = FinalPhaseState(system)
         state._ownership = MagicMock()
-        state._ownership.roll = ControlOwner.AIRCRAFT_AP
-        state._ownership.pitch = ControlOwner.AIRCRAFT_AP
+        state._ownership.roll = ControlOwner.EXTERNAL
+        state._ownership.pitch = ControlOwner.EXTERNAL
 
         telemetry = _make_telemetry()
         wind_data = {"corrected_vs": 650.0, "corrected_heading": 270.0}
 
         state._control_aircraft(telemetry, wind_data)
 
+        # After pretakeover removal: no AP VS commands sent
         vs_calls = [c for c in control.calls if c[0] == "set_vertical_speed"]
-        assert len(vs_calls) == 1
-        assert vs_calls[0][1] == -650
+        assert len(vs_calls) == 0, \
+            "AP VS commands must NOT be sent (pretakeover layer removed)"
 
 
 # ── Production path integration ────────────────────────────────────
@@ -611,17 +612,18 @@ class TestProductionPath:
 
         state = FinalPhaseState(system)
         state._ownership = MagicMock()
-        state._ownership.roll = ControlOwner.AIRCRAFT_AP
-        state._ownership.pitch = ControlOwner.AIRCRAFT_AP
+        state._ownership.roll = ControlOwner.EXTERNAL
+        state._ownership.pitch = ControlOwner.EXTERNAL
 
         telemetry = _make_telemetry(altitude_msl=1850.0, runway_elevation=600.0)
         wind_data = {"corrected_vs": 600.0, "corrected_heading": 270.0}
 
         state._control_aircraft(telemetry, wind_data)
 
+        # After pretakeover removal: no AP VS commands sent
         vs_calls = [c for c in control.calls if c[0] == "set_vertical_speed"]
-        assert len(vs_calls) == 1
-        assert vs_calls[0][1] == -700
+        assert len(vs_calls) == 0, \
+            "AP VS commands must NOT be sent (pretakeover layer removed)"
 
     def test_full_chain_mda_clamp(self):
         """At MDA_MSL → VS command is 0 regardless of wind_data."""
@@ -647,17 +649,18 @@ class TestProductionPath:
 
         state = FinalPhaseState(system)
         state._ownership = MagicMock()
-        state._ownership.roll = ControlOwner.AIRCRAFT_AP
-        state._ownership.pitch = ControlOwner.AIRCRAFT_AP
+        state._ownership.roll = ControlOwner.EXTERNAL
+        state._ownership.pitch = ControlOwner.EXTERNAL
 
         telemetry = _make_telemetry(altitude_msl=1100.0, runway_elevation=600.0)
         wind_data = {"corrected_vs": 800.0, "corrected_heading": 270.0}
 
         state._control_aircraft(telemetry, wind_data)
 
+        # After pretakeover removal: no AP VS commands sent
         vs_calls = [c for c in control.calls if c[0] == "set_vertical_speed"]
-        assert len(vs_calls) == 1
-        assert vs_calls[0][1] == 0
+        assert len(vs_calls) == 0, \
+            "AP VS commands must NOT be sent (pretakeover layer removed)"
 
 
 # ── Gain parameter ──────────────────────────────────────────────────

@@ -17,6 +17,7 @@ SDK_ONLY_EVENTS = frozenset({
     "AP_VS_ON",
     "NAV1_RADIO_SET_HZ",
     "NAV2_RADIO_SET_HZ",
+    "AUTO_THROTTLE_ARM",
 })
 
 AXIS_ABS_MAX = 16383  # SDK limit for *_SET axis events
@@ -326,6 +327,25 @@ class MSFSControl:
         except Exception as e:
             logger.error(f"Error setting aileron: {e}")
 
+    def set_elevator(self, percent: float):
+        """
+        Установить руль высоты (-1.0 до +1.0)
+
+        Args:
+            percent: Положение руля высоты
+                    -1.0 = нос вниз
+                     0.0 = нейтраль
+                    +1.0 = нос вверх
+        """
+        try:
+            percent = self._unit_input(percent, name="elevator")
+            value = max(-AXIS_ABS_MAX, min(AXIS_ABS_MAX, int(percent * 16384)))
+            self._send_event("ELEVATOR_SET", value)
+            logger.debug(f"Elevator set: {percent:+.2f} ({value})")
+
+        except Exception as e:
+            logger.error(f"Error setting elevator: {e}")
+
     # ── Readback methods (WP-3 / FIX-1) ──────────────────────────
 
     def get_autopilot_engaged(self) -> Optional[bool]:
@@ -355,3 +375,32 @@ class MSFSControl:
             return bool(self._aq.get("AUTOPILOT_THROTTLE_ARM"))
         except Exception:
             return None
+
+    def disengage_autothrottle(self) -> bool:
+        """Disengage onboard autothrottle via readback-verified toggle.
+
+        Returns True if confirmed disengaged, False otherwise.
+        """
+        if self._aq is None:
+            logger.warning("Cannot disengage A/T: no readback available")
+            return False
+
+        try:
+            armed = bool(self._aq.get("AUTOPILOT_THROTTLE_ARM"))
+        except Exception:
+            logger.warning("Cannot read AUTOPILOT_THROTTLE_ARM")
+            return False
+
+        if not armed:
+            return True  # already off
+
+        # Toggle off
+        self._send_event("AUTO_THROTTLE_ARM")
+
+        # Verify via readback (single re-read, no retry loop)
+        try:
+            armed_after = bool(self._aq.get("AUTOPILOT_THROTTLE_ARM"))
+        except Exception:
+            return False
+
+        return not armed_after

@@ -310,3 +310,108 @@ class TestProductionReadback:
 
         assert adapter.get_autopilot_engaged() is None
         assert adapter.get_autothrottle_engaged() is None
+
+
+class TestReadbackNoneFailClosed:
+    """Blocker 2: None readback must be fail-closed, not bool-converted."""
+
+    def test_get_autothrottle_engaged_none_readback(self):
+        """get_autothrottle_engaged: raw=None → return None (fail-closed)."""
+        from modules.control import MSFSControl
+
+        mock_ae = MagicMock()
+        mock_aq = MagicMock()
+        mock_aq.get.return_value = None
+
+        ctrl = MSFSControl(mock_ae, mock_aq)
+        result = ctrl.get_autothrottle_engaged()
+        assert result is None, f"Expected None, got {result}"
+
+    def test_get_autothrottle_engaged_zero_readback(self):
+        """get_autothrottle_engaged: raw=0 → return False."""
+        from modules.control import MSFSControl
+
+        mock_ae = MagicMock()
+        mock_aq = MagicMock()
+        mock_aq.get.return_value = 0
+
+        ctrl = MSFSControl(mock_ae, mock_aq)
+        result = ctrl.get_autothrottle_engaged()
+        assert result is False
+
+    def test_get_autothrottle_engaged_one_readback(self):
+        """get_autothrottle_engaged: raw=1 → return True."""
+        from modules.control import MSFSControl
+
+        mock_ae = MagicMock()
+        mock_aq = MagicMock()
+        mock_aq.get.return_value = 1
+
+        ctrl = MSFSControl(mock_ae, mock_aq)
+        result = ctrl.get_autothrottle_engaged()
+        assert result is True
+
+    def test_disengage_autothrottle_initial_none(self):
+        """disengage_autothrottle: initial readback=None → False (fail-closed)."""
+        from modules.control import MSFSControl
+
+        mock_ae = MagicMock()
+        mock_aq = MagicMock()
+        mock_aq.get.return_value = None
+
+        ctrl = MSFSControl(mock_ae, mock_aq)
+        result = ctrl.disengage_autothrottle()
+        assert result is False
+        # Must not send toggle event
+        mock_ae.find.assert_not_called()
+
+    def test_disengage_autothrottle_initial_zero(self):
+        """disengage_autothrottle: initial readback=0 → True (already off)."""
+        from modules.control import MSFSControl
+
+        mock_ae = MagicMock()
+        mock_aq = MagicMock()
+        mock_aq.get.return_value = 0
+
+        ctrl = MSFSControl(mock_ae, mock_aq)
+        result = ctrl.disengage_autothrottle()
+        assert result is True
+
+    def test_disengage_autothrottle_toggle_1_to_0(self):
+        """disengage_autothrottle: readback 1→toggle→0 → True."""
+        from modules.control import MSFSControl
+
+        mock_ae = MagicMock()
+        mock_aq = MagicMock()
+        # First read: armed=1, second read (verify): armed=0
+        mock_aq.get.side_effect = [1, 0]
+
+        ctrl = MSFSControl(mock_ae, mock_aq)
+        result = ctrl.disengage_autothrottle()
+        assert result is True
+
+    def test_disengage_autothrottle_toggle_1_to_1(self):
+        """disengage_autothrottle: readback 1→toggle→1 → False (toggle failed)."""
+        from modules.control import MSFSControl
+
+        mock_ae = MagicMock()
+        mock_aq = MagicMock()
+        # First read: armed=1, second read (verify): still 1
+        mock_aq.get.side_effect = [1, 1]
+
+        ctrl = MSFSControl(mock_ae, mock_aq)
+        result = ctrl.disengage_autothrottle()
+        assert result is False
+
+    def test_disengage_autothrottle_post_toggle_none(self):
+        """disengage_autothrottle: readback 1→toggle→None → False (fail-closed)."""
+        from modules.control import MSFSControl
+
+        mock_ae = MagicMock()
+        mock_aq = MagicMock()
+        # First read: armed=1, second read (verify): None
+        mock_aq.get.side_effect = [1, None]
+
+        ctrl = MSFSControl(mock_ae, mock_aq)
+        result = ctrl.disengage_autothrottle()
+        assert result is False

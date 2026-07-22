@@ -372,26 +372,34 @@ class MSFSControl:
         if self._aq is None:
             return None
         try:
-            return bool(self._aq.get("AUTOPILOT_THROTTLE_ARM"))
+            raw = self._aq.get("AUTOPILOT_THROTTLE_ARM")
         except Exception:
             return None
+        if raw is None:
+            return None
+        return bool(raw)
 
     def disengage_autothrottle(self) -> bool:
         """Disengage onboard autothrottle via readback-verified toggle.
 
         Returns True if confirmed disengaged, False otherwise.
+        None readback → fail-closed (return False).
         """
         if self._aq is None:
             logger.warning("Cannot disengage A/T: no readback available")
             return False
 
         try:
-            armed = bool(self._aq.get("AUTOPILOT_THROTTLE_ARM"))
+            raw = self._aq.get("AUTOPILOT_THROTTLE_ARM")
         except Exception:
             logger.warning("Cannot read AUTOPILOT_THROTTLE_ARM")
             return False
 
-        if not armed:
+        if raw is None:
+            logger.warning("AUTOPILOT_THROTTLE_ARM readback returned None")
+            return False
+
+        if not bool(raw):
             return True  # already off
 
         # Toggle off
@@ -399,8 +407,11 @@ class MSFSControl:
 
         # Verify via readback (single re-read, no retry loop)
         try:
-            armed_after = bool(self._aq.get("AUTOPILOT_THROTTLE_ARM"))
+            raw_after = self._aq.get("AUTOPILOT_THROTTLE_ARM")
         except Exception:
             return False
 
-        return not armed_after
+        if raw_after is None:
+            return False
+
+        return not bool(raw_after)

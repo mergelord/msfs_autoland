@@ -409,7 +409,7 @@ class AutoLandSystem:
         }
 
     def abort_approach_critical(self, reason: str):
-        """Unified critical abort — no actuator commands, just stop."""
+        """Unified critical abort — strict contract: CRITICAL log → audio alert → stop."""
         logger.critical("APPROACH ABORTED: %s", reason)
 
         # Audio alert with availability guard
@@ -418,14 +418,6 @@ class AutoLandSystem:
                 self.audio_system.play_alert("SINK_RATE")
             except Exception:
                 pass
-
-        # Deactivate our autothrottle controller if active
-        if hasattr(self, 'autothrottle') and self.autothrottle.active:
-            self.autothrottle.deactivate()
-
-        # Center vJoy axes (stop OUR inputs, not aircraft control)
-        if self.use_vjoy:
-            self.virtual_joystick.center_all_axes()
 
         self.stop_approach()
 

@@ -1,9 +1,8 @@
-"""Tests for abort_approach_critical — unified critical abort handler.
+"""Tests for abort_approach_critical — strict critical abort handler.
 
-Replaces old execute_go_around tests. abort_approach_critical must NOT
-send any actuator commands (AP, axes, throttle, flaps, gear, heading,
-altitude, speed). It only: logs CRITICAL, plays audio alert, deactivates
-our autothrottle, centers vJoy, and calls stop_approach.
+Strict contract: CRITICAL log with reason → audio alert → stop_approach().
+No actuator commands (AP, axes, throttle, flaps, gear, heading, altitude,
+speed). No autothrottle.deactivate(), no vJoy centering.
 """
 from unittest.mock import MagicMock, patch
 from tests.fakes import FakeControl
@@ -50,44 +49,6 @@ class TestAbortApproachCritical:
             system.abort_approach_critical("test")
             mock_stop.assert_called_once()
 
-    def test_abort_deactivates_our_autothrottle(self):
-        """abort_approach_critical must deactivate our autothrottle if active."""
-        from main import AutoLandSystem
-        system = AutoLandSystem.__new__(AutoLandSystem)
-        system.control = FakeControl()
-        system.autothrottle = MagicMock()
-        system.autothrottle.active = True
-        system.use_vjoy = False
-        system.virtual_joystick = MagicMock()
-        system.telemetry_recorder = MagicMock()
-        system.phase = MagicMock()
-        system.phase.value = 'FINAL'
-        system.audio_system = MagicMock()
-        system.audio_system.is_available.return_value = False
-
-        with patch.object(system, 'stop_approach'):
-            system.abort_approach_critical("test")
-            system.autothrottle.deactivate.assert_called_once()
-
-    def test_abort_centers_vjoy(self):
-        """abort_approach_critical must center vJoy axes when vJoy is used."""
-        from main import AutoLandSystem
-        system = AutoLandSystem.__new__(AutoLandSystem)
-        system.control = FakeControl()
-        system.autothrottle = MagicMock()
-        system.autothrottle.active = False
-        system.use_vjoy = True
-        system.virtual_joystick = MagicMock()
-        system.telemetry_recorder = MagicMock()
-        system.phase = MagicMock()
-        system.phase.value = 'FINAL'
-        system.audio_system = MagicMock()
-        system.audio_system.is_available.return_value = False
-
-        with patch.object(system, 'stop_approach'):
-            system.abort_approach_critical("test")
-            system.virtual_joystick.center_all_axes.assert_called_once()
-
     def test_abort_sends_no_actuator_commands(self):
         """abort_approach_critical must NOT send any actuator commands.
 
@@ -125,6 +86,71 @@ class TestAbortApproachCritical:
             "abort must NOT send gear"
         assert not ctrl.has_call('set_airspeed_hold'), \
             "abort must NOT send airspeed hold"
+
+    def test_abort_no_autothrottle_deactivate(self):
+        """abort_approach_critical must NOT deactivate autothrottle."""
+        from main import AutoLandSystem
+        system = AutoLandSystem.__new__(AutoLandSystem)
+        system.control = FakeControl()
+        system.autothrottle = MagicMock()
+        system.autothrottle.active = True
+        system.use_vjoy = False
+        system.virtual_joystick = MagicMock()
+        system.telemetry_recorder = MagicMock()
+        system.phase = MagicMock()
+        system.phase.value = 'FINAL'
+        system.audio_system = MagicMock()
+        system.audio_system.is_available.return_value = False
+
+        with patch.object(system, 'stop_approach'):
+            system.abort_approach_critical("test")
+            system.autothrottle.deactivate.assert_not_called()
+
+    def test_abort_no_vjoy_center(self):
+        """abort_approach_critical must NOT center vJoy axes."""
+        from main import AutoLandSystem
+        system = AutoLandSystem.__new__(AutoLandSystem)
+        system.control = FakeControl()
+        system.autothrottle = MagicMock()
+        system.autothrottle.active = False
+        system.use_vjoy = True
+        system.virtual_joystick = MagicMock()
+        system.telemetry_recorder = MagicMock()
+        system.phase = MagicMock()
+        system.phase.value = 'FINAL'
+        system.audio_system = MagicMock()
+        system.audio_system.is_available.return_value = False
+
+        with patch.object(system, 'stop_approach'):
+            system.abort_approach_critical("test")
+            system.virtual_joystick.center_all_axes.assert_not_called()
+
+    def test_abort_with_vjoy_no_control_calls(self):
+        """When use_vjoy=True, abort must not send any control calls."""
+        from main import AutoLandSystem
+        system = AutoLandSystem.__new__(AutoLandSystem)
+        system.control = FakeControl()
+        system.autothrottle = MagicMock()
+        system.autothrottle.active = False
+        system.use_vjoy = True
+        system.virtual_joystick = MagicMock()
+        system.telemetry_recorder = MagicMock()
+        system.phase = MagicMock()
+        system.phase.value = 'FINAL'
+        system.audio_system = MagicMock()
+        system.audio_system.is_available.return_value = False
+
+        with patch.object(system, 'stop_approach'):
+            system.abort_approach_critical("test")
+
+        ctrl = system.control
+        assert not ctrl.has_call('set_autopilot_master')
+        assert not ctrl.has_call('set_heading_hold')
+        assert not ctrl.has_call('set_vertical_speed')
+        assert not ctrl.has_call('set_throttle')
+        assert not ctrl.has_call('set_flaps')
+        assert not ctrl.has_call('set_gear')
+        system.virtual_joystick.center_all_axes.assert_not_called()
 
 
 class TestErrorBudgetF4:

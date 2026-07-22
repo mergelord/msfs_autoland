@@ -18,7 +18,6 @@ from modules.autothrottle import (AutothrottleController,
 from modules.connection_monitor import ConnectionMonitor
 from modules.connection_optimizer import ConnectionOptimizer
 from modules.control import MSFSControl
-from contextlib import nullcontext
 from modules.command_gateway import CommandGateway, CommandSource
 from modules.control_ownership import compute_ownership
 from modules.dme_navigation import DMENavigation
@@ -360,16 +359,6 @@ class AutoLandSystem:
         # Start telemetry recorder
         self.telemetry_recorder.start_recording()
 
-        # Включение автопилота
-        if self.use_custom_autopilot and self.aircraft_adapter:
-            self.aircraft_adapter.engage_autopilot()
-            self.aircraft_adapter.set_speed(self.approach_config.approach_speed)
-            logger.info("Custom autopilot engaged via aircraft adapter")
-        else:
-            self.control.set_autopilot_master(True)
-            self.control.set_airspeed_hold(self.approach_config.approach_speed)
-            logger.info("Standard autopilot engaged")
-
     def stop_approach(self):
         """Остановить заход"""
         self.running = False
@@ -419,50 +408,18 @@ class AutoLandSystem:
             'total_switches': len(self.connection_monitor.switch_history)
         }
 
-    def execute_go_around(self):
-        """Выполнить уход на второй круг"""
-        logger.critical("EXECUTING GO AROUND!")
+    def abort_approach_critical(self, reason: str):
+        """Unified critical abort — strict contract: CRITICAL log → audio alert → stop."""
+        logger.critical("APPROACH ABORTED: %s", reason)
 
-        # 0. Деактивация autothrottle
-        if self.autothrottle.active:
-            self.autothrottle.deactivate()
-            logger.info("Go-around: Autothrottle deactivated")
+        # Audio alert with availability guard
+        if self.audio_system and self.audio_system.is_available():
+            try:
+                self.audio_system.play_alert("SINK_RATE")
+            except Exception:
+                pass
 
-        scope = (self.control.source_scope(CommandSource.SAFETY)
-                 if hasattr(self.control, "source_scope") else nullcontext())
-        with scope:
-            # F3: re-engage AP master BEFORE sending AP commands.
-            # Idempotent: safe even if takeover hasn't happened.
-            self.control.set_autopilot_master(True)
-            logger.info("Go-around: AP master re-engaged")
-
-            if self.vjoy_throttle and self.vjoy_throttle.enabled:
-                self.vjoy_throttle.set_throttle(1.0)
-            else:
-                self.control.set_throttle(1.0)
-            logger.info("Go-around: Full throttle")
-
-            self.control.set_vertical_speed(1500)
-            logger.info("Go-around: Climb 1500 fpm")
-
-            self.control.set_flaps(2)
-            logger.info("Go-around: Flaps to takeoff position")
-
-            # F3: real gear UP command
-            self.control.set_gear(False)
-            logger.info("Go-around: Gear UP")
-
-        # 5. Если vJoy доступен, центрируем управление
-        if self.use_vjoy:
-            self.virtual_joystick.center_all_axes()
-
-        # 6. Сброс монитора стабилизации
-        self.stabilized_monitor.reset()
-
-        # 7. Остановка захода
         self.stop_approach()
-
-        logger.critical("GO AROUND COMPLETED - Approach aborted")
 
     def _calculate_approach_speeds(self, config: ApproachConfig):
         """
@@ -614,13 +571,10 @@ class AutoLandSystem:
                 # Pre-takeover: stop is safe (AP master is still on).
                 if consecutive_errors >= max_consecutive_errors:
                     logger.critical(
-                        "Too many consecutive errors (%d) - stopping approach",
+                        "Too many consecutive errors (%d) - aborting approach",
                         consecutive_errors
                     )
-                    if self.autopilot_takeover.status.completed:
-                        self.execute_go_around()
-                    else:
-                        self.stop_approach()
+                    self.abort_approach_critical("error budget exceeded")
                     break
 
                 # Пауза перед retry, чтобы дать SimConnect восстановиться
@@ -689,8 +643,8 @@ class AutoLandSystem:
             # it handles signal loss internally (loc_available=False).
             loc_data = self.ils_navigation.calculate_loc_approach(data, ils)
             if not loc_data.get('loc_available', False):
-                logger.warning("LOC signal lost — executing go-around")
-                # FIX-13: Set pending terminal frame, then execute_go_around.
+                logger.warning("LOC signal lost — aborting approach")
+                # FIX-13: Set pending terminal frame, then abort.
                 # stop_approach → stop_recording flushes pending frame to disk.
                 self.telemetry_recorder.set_pending_frame(
                     telemetry=data,
@@ -698,7 +652,7 @@ class AutoLandSystem:
                     guard_decision=None,
                     guard_reason=None,
                 )
-                self.execute_go_around()
+                self.abort_approach_critical("LOC signal lost")
                 return None
             return loc_data
         else:
@@ -720,9 +674,9 @@ class AutoLandSystem:
         self._last_guard_reason = None
 
         # Fail-closed: signal loss returns None from _calculate_approach_data.
-        # For LOC loss, execute_go_around was already called in
+        # For LOC loss, abort_approach_critical was already called in
         # _calculate_approach_data, which flushes pending frame via stop_recording.
-        # _handle_phase(None) is a clean no-op — no duplicate go-around.
+        # _handle_phase(None) is a clean no-op — no duplicate abort.
         if approach_data is None:
             return
 
@@ -750,9 +704,9 @@ class AutoLandSystem:
             if guard_result.decision == GuardDecision.GO_AROUND:
                 self._last_guard_decision = "GO_AROUND"
                 self._last_guard_reason = guard_result.reason
-                logger.critical("SAFETY GUARD: GO_AROUND — %s %s",
+                logger.critical("SAFETY GUARD: ABORT — %s %s",
                                 guard_result.reason, guard_result.details)
-                # FIX-14: Set pending frame, execute actuator commands.
+                # FIX-14: Set pending frame, then abort.
                 # stop_approach → stop_recording flushes pending to disk.
                 self.telemetry_recorder.set_pending_frame(
                     telemetry=telemetry,
@@ -760,7 +714,7 @@ class AutoLandSystem:
                     guard_decision="GO_AROUND",
                     guard_reason=guard_result.reason,
                 )
-                self.execute_go_around()
+                self.abort_approach_critical(f"safety guard: {guard_result.reason}")
                 return
 
             # Near-trigger logging: debounce counting but not yet at threshold

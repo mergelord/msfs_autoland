@@ -107,15 +107,15 @@ class TestApproachLifecycleReset:
             "_ils_info_logged should be False after reset"
 
     def test_go_around_then_start_is_clean(self):
-        """После go-around + start_approach, takeover state должен быть чистым."""
+        """После abort + start_approach, takeover state должен быть чистым."""
         system = _make_system_with_completed_takeover()
 
-        # Мокаем dependencies для go-around
+        # Мокаем dependencies для abort
         system.autothrottle.active = False
         system.vjoy_throttle = None
 
-        # Выполняем go-around
-        system.execute_go_around()
+        # Выполняем abort
+        system.abort_approach_critical("test abort")
 
         # Проверяем что stop_approach сбросил phase
         from main import ApproachPhase

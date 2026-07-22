@@ -110,11 +110,11 @@ class AutoLandGUI:
         )
         self.stop_btn.grid(row=0, column=7, padx=5)
 
-        self.ga_btn = ttk.Button(
-            top_frame, text="GO AROUND", command=self.go_around, state="disabled"
+        self.abort_btn = ttk.Button(
+            top_frame, text="ABORT", command=self.abort_approach, state="disabled"
         )
-        self.ga_btn.grid(row=0, column=8, padx=5)
-        self.ga_btn.configure(style="Danger.TButton")
+        self.abort_btn.grid(row=0, column=8, padx=5)
+        self.abort_btn.configure(style="Danger.TButton")
 
         # Чекбокс звуковых предупреждений
         self.audio_alerts_var = tk.BooleanVar(value=True)
@@ -1417,7 +1417,7 @@ class AutoLandGUI:
             self.disconnect_btn.config(state="disabled")
             self.start_btn.config(state="disabled")
             self.stop_btn.config(state="disabled")
-            self.ga_btn.config(state="disabled")
+            self.abort_btn.config(state="disabled")
 
             # Сброс отображаемых данных
             self.aircraft_name_var.set("N/A")
@@ -1461,7 +1461,7 @@ class AutoLandGUI:
 
         self.start_btn.config(state="disabled")
         self.stop_btn.config(state="normal")
-        self.ga_btn.config(state="normal")
+        self.abort_btn.config(state="normal")
 
     def run_approach(self):
         """Выполнение захода в отдельном потоке"""
@@ -1474,7 +1474,7 @@ class AutoLandGUI:
         self.running = False
         self.start_btn.config(state="normal")
         self.stop_btn.config(state="disabled")
-        self.ga_btn.config(state="disabled")
+        self.abort_btn.config(state="disabled")
 
     def toggle_audio_alerts(self):
         """Переключить звуковые предупреждения"""
@@ -1483,10 +1483,10 @@ class AutoLandGUI:
             status = "enabled" if self.audio_alerts_var.get() else "disabled"
             logging.info("Audio alerts %s", status)
 
-    def go_around(self):
-        """Уход на второй круг"""
+    def abort_approach(self):
+        """Аварийный останов захода"""
         if self.system:
-            self.system.execute_go_around()
+            self.system.abort_approach_critical("manual abort from GUI")
 
     def _get_compatibility_info(self, adapter):
         """Получить информацию о совместимости адаптера"""

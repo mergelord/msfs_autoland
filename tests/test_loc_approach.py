@@ -429,7 +429,11 @@ class TestILSUnchanged:
     """ILS approach behaviour must not change with LOC addition."""
 
     def test_ils_still_uses_dh_guard(self):
-        """ILS: use_ils=True → DH guard active in FinalPhaseState."""
+        """ILS: use_ils=True → DH guard active in FinalPhaseState.
+
+        After pretakeover removal, _control_aircraft no longer sends
+        AP commands (heading/VS). AP is OFF before takeover.
+        """
         from modules.approach_phases import FinalPhaseState
         from modules.control_ownership import ControlOwner
         from tests.fakes import FakeControl
@@ -447,8 +451,8 @@ class TestILSUnchanged:
 
         state = FinalPhaseState(system)
         state._ownership = MagicMock()
-        state._ownership.roll = ControlOwner.AIRCRAFT_AP
-        state._ownership.pitch = ControlOwner.AIRCRAFT_AP
+        state._ownership.roll = ControlOwner.EXTERNAL
+        state._ownership.pitch = ControlOwner.EXTERNAL
 
         # Below DH → DH guard triggers
         telemetry = _make_telemetry(altitude_msl=800.0, altitude_agl=200.0)
@@ -456,10 +460,10 @@ class TestILSUnchanged:
 
         state._control_aircraft(telemetry, wind_data)
 
-        # ILS uses wind_data['corrected_vs'] directly (no synthetic glidepath)
+        # After pretakeover removal: no AP VS commands sent
         vs_calls = [c for c in control.calls if c[0] == "set_vertical_speed"]
-        assert len(vs_calls) == 1
-        assert vs_calls[0][1] == -600
+        assert len(vs_calls) == 0, \
+            "AP VS commands must NOT be sent (pretakeover layer removed)"
 
 
 # ── Neighbour: VOR/NDB unchanged ──────────────────────────────────
@@ -498,18 +502,18 @@ class TestVORUnchanged:
 
         state = FinalPhaseState(system)
         state._ownership = MagicMock()
-        state._ownership.roll = ControlOwner.AIRCRAFT_AP
-        state._ownership.pitch = ControlOwner.AIRCRAFT_AP
+        state._ownership.roll = ControlOwner.EXTERNAL
+        state._ownership.pitch = ControlOwner.EXTERNAL
 
         telemetry = _make_telemetry(altitude_msl=1850.0, altitude_agl=1250.0)
         wind_data = {"corrected_vs": 600.0, "corrected_heading": 270.0}
 
         state._control_aircraft(telemetry, wind_data)
 
+        # After pretakeover removal: no AP VS commands sent
         vs_calls = [c for c in control.calls if c[0] == "set_vertical_speed"]
-        assert len(vs_calls) == 1
-        # VOR uses synthetic glidepath, not wind_data directly
-        assert vs_calls[0][1] != -600  # Different from raw wind_data
+        assert len(vs_calls) == 0, \
+            "AP VS commands must NOT be sent (pretakeover layer removed)"
 
 
 # ── Production-path: lateral from CDI ──────────────────────────────
@@ -594,18 +598,15 @@ class TestLOCLateralPipeline:
 
         state = FinalPhaseState(system)
         state._ownership = MagicMock()
-        state._ownership.roll = ControlOwner.AIRCRAFT_AP
-        state._ownership.pitch = ControlOwner.AIRCRAFT_AP
+        state._ownership.roll = ControlOwner.EXTERNAL
+        state._ownership.pitch = ControlOwner.EXTERNAL
 
         state._control_aircraft(telemetry, wind_data)
 
-        vs_calls = [c for c in control.calls if c[0] == "set_heading_hold"]
-        assert len(vs_calls) == 1
-        heading = vs_calls[0][1]
-        # CDI=63 → heading ≈ 266°, NOT 270°
-        assert abs(heading - 266) < 2.0, (
-            f"set_heading_hold should receive LOC heading ~266°, "
-            f"got {heading}")
+        # After pretakeover removal: no AP heading commands sent
+        heading_calls = [c for c in control.calls if c[0] == "set_heading_hold"]
+        assert len(heading_calls) == 0, \
+            "AP heading commands must NOT be sent (pretakeover layer removed)"
 
     def test_red_without_fix_cdi_pipeline(self):
         """If approach_data['corrected_heading'] is ignored,
@@ -683,7 +684,7 @@ class TestLOCSignalLossFailClosed:
     """LOC signal lost mid-approach → go-around, no commands after loss."""
 
     def test_loc_signal_loss_triggers_go_around(self):
-        """Valid signal → signal lost → execute_go_around called."""
+        """Valid signal → signal lost → abort_approach_critical called."""
         from main import AutoLandSystem
 
         system = MagicMock()
@@ -709,7 +710,7 @@ class TestLOCSignalLossFailClosed:
         result_ok = AutoLandSystem._calculate_approach_data(system, data_ok)
         assert result_ok['loc_available'] is True
 
-        # Frame 2: signal lost → execute_go_around + returns None
+        # Frame 2: signal lost → abort_approach_critical + returns None
         data_lost = {
             'position': {'latitude': 55.75, 'longitude': 37.50,
                          'altitude': 1180, 'altitude_agl': 580},
@@ -719,9 +720,9 @@ class TestLOCSignalLossFailClosed:
         }
         result_lost = AutoLandSystem._calculate_approach_data(system, data_lost)
 
-        system.execute_go_around.assert_called_once()
+        system.abort_approach_critical.assert_called_once()
         assert result_lost is None, (
-            "Signal loss should return None (go-around), not error dict")
+            "Signal loss should return None (abort), not error dict")
 
     def test_loc_signal_loss_no_commands_after_loss(self):
         """After signal loss, no heading/VS commands are sent."""
@@ -782,7 +783,7 @@ class TestLOCSignalLossFailClosed:
             result = AutoLandSystem._calculate_approach_data(system, data)
 
         assert result is None
-        assert "executing go-around" in caplog.text
+        assert "aborting approach" in caplog.text
         assert "falling back" not in caplog.text
 
     def test_red_without_fix_loc_signal_loss(self):
@@ -828,17 +829,18 @@ class TestNeighboursUnchangedByLOCSignalLoss:
 
         state = FinalPhaseState(system)
         state._ownership = MagicMock()
-        state._ownership.roll = ControlOwner.AIRCRAFT_AP
-        state._ownership.pitch = ControlOwner.AIRCRAFT_AP
+        state._ownership.roll = ControlOwner.EXTERNAL
+        state._ownership.pitch = ControlOwner.EXTERNAL
 
         telemetry = _make_telemetry(altitude_msl=800.0, altitude_agl=200.0)
         wind_data = {"corrected_vs": 600.0, "corrected_heading": 270.0}
 
         state._control_aircraft(telemetry, wind_data)
 
+        # After pretakeover removal: no AP VS commands sent
         vs_calls = [c for c in control.calls if c[0] == "set_vertical_speed"]
-        assert len(vs_calls) == 1
-        assert vs_calls[0][1] == -600
+        assert len(vs_calls) == 0, \
+            "AP VS commands must NOT be sent (pretakeover layer removed)"
 
     def test_vor_unchanged_loc_loss(self):
         """VOR approach still works with LOC signal loss fix."""
@@ -872,17 +874,18 @@ class TestNeighboursUnchangedByLOCSignalLoss:
 
         state = FinalPhaseState(system)
         state._ownership = MagicMock()
-        state._ownership.roll = ControlOwner.AIRCRAFT_AP
-        state._ownership.pitch = ControlOwner.AIRCRAFT_AP
+        state._ownership.roll = ControlOwner.EXTERNAL
+        state._ownership.pitch = ControlOwner.EXTERNAL
 
         telemetry = _make_telemetry(altitude_msl=1850.0, altitude_agl=1250.0)
         wind_data = {"corrected_vs": 600.0, "corrected_heading": 270.0}
 
         state._control_aircraft(telemetry, wind_data)
 
+        # After pretakeover removal: no AP VS commands sent
         vs_calls = [c for c in control.calls if c[0] == "set_vertical_speed"]
-        assert len(vs_calls) == 1
-        assert vs_calls[0][1] != -600  # VOR uses synthetic glidepath
+        assert len(vs_calls) == 0, \
+            "AP VS commands must NOT be sent (pretakeover layer removed)"
 
     def test_ndb_unchanged_loc_loss(self):
         """NDB approach still works with LOC signal loss fix."""

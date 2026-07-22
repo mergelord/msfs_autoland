@@ -133,6 +133,7 @@ class TestControlOwnership:
         system.control = ctrl
         system.virtual_joystick = vjoy
         system.use_vjoy = True
+        system.synthetic_glidepath = None  # No glidepath → use wind_data['corrected_vs']
 
         phase = FinalPhaseState(system)
 
@@ -145,7 +146,10 @@ class TestControlOwnership:
             use_autothrottle=True,
         )
 
-        telemetry = {"attitude": {"bank": 0, "pitch": 2.5, "heading_magnetic": 270}}
+        telemetry = {
+            "attitude": {"bank": 0, "pitch": 2.5, "heading_magnetic": 270},
+            "speed": {"ground_speed": 140, "vertical_speed": -700},
+        }
         wind_data = {"corrected_heading": 270, "corrected_vs": 700}
 
         phase._control_aircraft(telemetry, wind_data)
